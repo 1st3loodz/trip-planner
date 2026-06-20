@@ -88,31 +88,40 @@ export function TripProvider({ children }: { children: React.ReactNode }) {
       setUserId(uid);
 
       // ── Step 1: get all trip_ids this user is a member of ─────────────────
-      const { data: memberRows } = await supabase
+      const { data: memberRows, error: memberErr } = await supabase
         .from("trip_members")
         .select("trip_id")
         .eq("user_id", uid);
 
+      console.log("[TripContext] uid =", uid);
+      console.log("[TripContext] trip_members rows =", memberRows, "error =", memberErr);
+
       const joinedTripIds: string[] = memberRows ? memberRows.map((r: any) => r.trip_id) : [];
+      console.log("[TripContext] joinedTripIds =", joinedTripIds);
 
       const SELECT_COLS = `id, title, destination, start_date, end_date, total_days, status, travel_type, base_currency, created_by, days, expenses, custom_categories`;
 
-      // ── Step 2a: trips the user created (passes RLS creator filter) ────────
-      const { data: createdTrips } = await supabase
+      // ── Step 2a: trips the user created ───────────────────────────────────
+      const { data: createdTrips, error: createdErr } = await supabase
         .from("trips")
         .select(SELECT_COLS)
         .eq("created_by", uid)
         .order("start_date", { ascending: false });
 
-      // ── Step 2b: trips the user joined via invite link (fetch by ID list) ──
-      // Fetching by explicit ID bypasses the "created_by" RLS ownership check.
+      console.log("[TripContext] createdTrips =", createdTrips?.length ?? 0, "error =", createdErr);
+
+      // ── Step 2b: trips the user joined via invite (fetch by explicit ID) ──
+      // NOTE: This requires an RLS policy on `trips` that allows SELECT when
+      // a row exists in `trip_members` for the current user. See README.
       let joinedTrips: any[] = [];
       if (joinedTripIds.length > 0) {
-        const { data: joinedData } = await supabase
+        const { data: joinedData, error: joinedErr } = await supabase
           .from("trips")
           .select(SELECT_COLS)
           .in("id", joinedTripIds)
           .order("start_date", { ascending: false });
+
+        console.log("[TripContext] joinedTrips =", joinedData?.length ?? 0, "error =", joinedErr?.message);
         if (joinedData) joinedTrips = joinedData;
       }
 
@@ -124,6 +133,8 @@ export function TripProvider({ children }: { children: React.ReactNode }) {
         seen.add(t.id);
         return true;
       });
+
+      console.log("[TripContext] final fetchedTrips count =", fetchedTrips.length);
 
       if (!mounted) return;
 
@@ -160,7 +171,6 @@ export function TripProvider({ children }: { children: React.ReactNode }) {
               avatarUrl: undefined
             };
           }
-          
           const profile = profilesData.find(p => p.id === m.user_id);
           const avUrl = profile?.avatar_url && profile.avatar_url.trim() !== "" ? profile.avatar_url : undefined;
           return {
@@ -170,7 +180,6 @@ export function TripProvider({ children }: { children: React.ReactNode }) {
             avatarUrl: avUrl
           };
         });
-
         return dbRowToTrip(tripRow, mappedParticipants);
       });
 
