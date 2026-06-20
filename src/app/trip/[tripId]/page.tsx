@@ -364,7 +364,7 @@ export default function TripDetailPage({ params }: { params: Promise<{ tripId: s
       {/* ── Page content ── */}
       <div className="mx-auto max-w-4xl px-4 pt-24 pb-8 sm:px-6">
         <TripHeader
-          trip={baseTrip}
+          trip={baseTrip!}
           activeTab={activeTab}
           onTabChange={setActiveTab}
           onManageMembers={() => setShowMembersModal(true)}
