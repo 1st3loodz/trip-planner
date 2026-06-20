@@ -99,6 +99,20 @@ export function TripProvider({ children }: { children: React.ReactNode }) {
       const joinedTripIds: string[] = memberRows ? memberRows.map((r: any) => r.trip_id) : [];
       console.log("[TripContext] joinedTripIds =", joinedTripIds);
 
+      // ── IMPORTANT: Supabase RLS requirement ───────────────────────────────
+      // The trips table must have a SELECT policy that allows members to read
+      // rows where they are listed in trip_members. Required SQL (run once in
+      // Supabase SQL Editor):
+      //
+      // DROP POLICY IF EXISTS "Members can view their trips" ON public.trips;
+      // CREATE POLICY "Members can view their trips" ON public.trips
+      //   FOR SELECT USING (
+      //     auth.uid() = created_by
+      //     OR auth.uid() IN (
+      //       SELECT user_id FROM public.trip_members WHERE trip_id = id
+      //     )
+      //   );
+      // ─────────────────────────────────────────────────────────────────────
       const SELECT_COLS = `id, title, destination, start_date, end_date, total_days, status, travel_type, base_currency, created_by, days, expenses, custom_categories`;
 
       // ── Step 2a: trips the user created ───────────────────────────────────
