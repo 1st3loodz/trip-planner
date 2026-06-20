@@ -94,8 +94,6 @@ export default function InvitePage({ params }: { params: Promise<{ tripId: strin
         authUser.email?.split("@")[0] ||
         "New Traveler";
 
-      const avatarColor = getAvatarColor(authUser.id);
-
       // Insert new member row
       const { error: insertError } = await supabase
         .from("trip_members")
@@ -103,7 +101,6 @@ export default function InvitePage({ params }: { params: Promise<{ tripId: strin
           trip_id:        tripId,
           user_id:        authUser.id,
           temporary_name: displayName,
-          color:          avatarColor,
         });
 
       if (insertError) {
