@@ -8,11 +8,13 @@ import { Trip, TripStatus, Currency } from "@/types/trip";
 import { generateId, formatDate } from "@/lib/utils";
 import CreateTripModal from "@/components/CreateTripModal";
 import ConfirmDeleteModal from "@/components/ConfirmDeleteModal";
+import ConfirmLeaveModal from "@/components/ConfirmLeaveModal";
 
 export default function DashboardPage() {
   const { trips, isLoaded, userId, addTrip, deleteTrip, leaveTrip } = useTrips();
   const router = useRouter();
   const [tripToDelete, setTripToDelete] = useState<Trip | null>(null);
+  const [tripToLeave, setTripToLeave] = useState<Trip | null>(null);
   const [modalStatus, setModalStatus] = useState<TripStatus | null>(null);
 
   if (!isLoaded) {
@@ -158,7 +160,7 @@ export default function DashboardPage() {
                   trip={trip}
                   isOwner={trip.createdBy === userId || !userId}
                   onDeleteRequest={() => setTripToDelete(trip)}
-                  onLeaveRequest={() => leaveTrip(trip.id)}
+                  onLeaveRequest={() => setTripToLeave(trip)}
                 />
               ))}
 
@@ -193,8 +195,18 @@ export default function DashboardPage() {
       {tripToDelete && (
         <ConfirmDeleteModal
           title={tripToDelete.title}
+          description="WARNING: Are you absolutely sure you want to delete this entire trip? This will erase all data for all group members permanently."
           onConfirm={() => { deleteTrip(tripToDelete.id); setTripToDelete(null); }}
           onCancel={() => setTripToDelete(null)}
+        />
+      )}
+
+      {tripToLeave && (
+        <ConfirmLeaveModal
+          title={tripToLeave.title}
+          description="Are you sure you want to leave this trip?"
+          onConfirm={() => { leaveTrip(tripToLeave.id); setTripToLeave(null); }}
+          onCancel={() => setTripToLeave(null)}
         />
       )}
     </main>
