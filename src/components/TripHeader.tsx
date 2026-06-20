@@ -19,7 +19,16 @@ export default function TripHeader({ trip, activeTab, onTabChange, onManageMembe
   const [isEditingNotes, setIsEditingNotes]  = useState(false);
   const [notesText,      setNotesText]       = useState(trip.notes ?? "");
   const [isSavingNotes,  setIsSavingNotes]   = useState(false);
+  const [linkCopied,     setLinkCopied]      = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const handleCopyInviteLink = () => {
+    const url = `https://trip-planner-six-kappa.vercel.app/trip/${trip.id}/invite`;
+    navigator.clipboard.writeText(url).then(() => {
+      setLinkCopied(true);
+      setTimeout(() => setLinkCopied(false), 2500);
+    });
+  };
   const { updateTrip } = useTrips();
 
   // Sync notesText whenever the parent trip prop refreshes
@@ -159,12 +168,24 @@ export default function TripHeader({ trip, activeTab, onTabChange, onManageMembe
                 <Avatar key={p.id} name={p.name} colorClass={p.color} avatarUrl={p.avatarUrl} size="sm" />
               ))}
             </div>
-            <button
-              onClick={onManageMembers}
-              className="game-btn ml-auto flex items-center gap-1.5 px-3 py-1.5 font-pixel text-[7px] uppercase bg-[#4a7c59] text-[#fdfbf7] dark:bg-[#2d5a3d]"
-            >
-              👥 Manage Party
-            </button>
+            <div className="ml-auto flex items-center gap-2">
+              <button
+                onClick={handleCopyInviteLink}
+                className={`game-btn flex items-center gap-1.5 px-3 py-1.5 font-pixel text-[7px] uppercase transition-colors ${
+                  linkCopied
+                    ? "bg-amber-600 text-white dark:bg-amber-700"
+                    : "bg-[#f5eed7] text-stone-800 dark:bg-[#1e1815] dark:text-[#fdfbf7] dark:border-[#54463d]"
+                }`}
+              >
+                {linkCopied ? "✔ Copied!" : "🔗 Invite Link"}
+              </button>
+              <button
+                onClick={onManageMembers}
+                className="game-btn flex items-center gap-1.5 px-3 py-1.5 font-pixel text-[7px] uppercase bg-[#4a7c59] text-[#fdfbf7] dark:bg-[#2d5a3d]"
+              >
+                👥 Manage Party
+              </button>
+            </div>
           </div>
         </div>
 
