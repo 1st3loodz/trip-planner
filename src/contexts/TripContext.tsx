@@ -7,9 +7,11 @@ import { createClient } from "@/utils/supabase/client";
 interface TripContextType {
   trips: Trip[];
   isLoaded: boolean;
+  userId: string | null;
   addTrip: (trip: Omit<Trip, "id">) => Promise<string | null>;
   updateTrip: (id: string, partialTrip: Partial<Trip>) => void;
   deleteTrip: (id: string) => void;
+  leaveTrip: (tripId: string) => Promise<void>;
   getTrip: (id: string) => Trip | undefined;
   addTripMember: (tripId: string, participant: Participant) => Promise<void>;
   removeTripMember: (tripId: string, participantId: string) => Promise<void>;
@@ -60,6 +62,7 @@ function dbRowToTrip(row: any, participants: any[] = []): Trip {
     status:           row.status,
     travelType:       row.travel_type     ?? "solo",
     baseCurrency:     row.base_currency   ?? "THB",
+    createdBy:        row.created_by      ?? undefined,
     participants:     participants,
     days:             row.days            ?? [],
     expenses:         row.expenses        ?? [],
@@ -399,6 +402,24 @@ export function TripProvider({ children }: { children: React.ReactNode }) {
     }
   }, [userId, supabase]);
 
+  // Leave a trip the user joined but did NOT create (removes their trip_members row only)
+  const leaveTrip = useCallback(async (tripId: string) => {
+    if (!userId) return;
+
+    // Optimistic UI — remove the trip from this user's view immediately
+    setTrips((prev) => prev.filter((t) => t.id !== tripId));
+
+    const { error } = await supabase
+      .from("trip_members")
+      .delete()
+      .eq("trip_id", tripId)
+      .eq("user_id", userId);
+
+    if (error) {
+      console.error("[leaveTrip] Failed to remove member row:", error.message);
+    }
+  }, [userId, supabase]);
+
   const addTripMember = useCallback(async (tripId: string, participant: Participant) => {
     // 1. INSTANT Optimistic UI Update!
     const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
@@ -484,7 +505,7 @@ export function TripProvider({ children }: { children: React.ReactNode }) {
   );
 
   return (
-    <TripContext.Provider value={{ trips, isLoaded, addTrip, updateTrip, deleteTrip, getTrip, addTripMember, removeTripMember, refreshTrips }}>
+    <TripContext.Provider value={{ trips, isLoaded, userId, addTrip, updateTrip, deleteTrip, leaveTrip, getTrip, addTripMember, removeTripMember, refreshTrips }}>
       {children}
     </TripContext.Provider>
   );

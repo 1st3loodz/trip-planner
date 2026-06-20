@@ -147,6 +147,8 @@ export interface Trip {
   travelType?: "solo" | "group";
   baseCurrency?: Currency;
   notes?: string;
+  /** UUID of the user who created this trip — used for ownership checks */
+  createdBy?: string;
 }
 
 // ─── Settlement ───────────────────────────────────────────────────────────────

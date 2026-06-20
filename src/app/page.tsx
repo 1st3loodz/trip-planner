@@ -10,7 +10,7 @@ import CreateTripModal from "@/components/CreateTripModal";
 import ConfirmDeleteModal from "@/components/ConfirmDeleteModal";
 
 export default function DashboardPage() {
-  const { trips, isLoaded, addTrip, deleteTrip } = useTrips();
+  const { trips, isLoaded, userId, addTrip, deleteTrip, leaveTrip } = useTrips();
   const router = useRouter();
   const [tripToDelete, setTripToDelete] = useState<Trip | null>(null);
   const [modalStatus, setModalStatus] = useState<TripStatus | null>(null);
@@ -153,7 +153,13 @@ export default function DashboardPage() {
             {/* Trip cards */}
             <div className="flex-1 space-y-4 mb-6">
               {tripsByStatus[status].map((trip) => (
-                <TripCard key={trip.id} trip={trip} onDeleteRequest={() => setTripToDelete(trip)} />
+                <TripCard
+                  key={trip.id}
+                  trip={trip}
+                  isOwner={trip.createdBy === userId || !userId}
+                  onDeleteRequest={() => setTripToDelete(trip)}
+                  onLeaveRequest={() => leaveTrip(trip.id)}
+                />
               ))}
 
               {tripsByStatus[status].length === 0 && (
@@ -196,7 +202,17 @@ export default function DashboardPage() {
 }
 
 /* ── Trip Card ──────────────────────────────────────────────────────────── */
-function TripCard({ trip, onDeleteRequest }: { trip: Trip; onDeleteRequest: () => void }) {
+function TripCard({
+  trip,
+  isOwner,
+  onDeleteRequest,
+  onLeaveRequest,
+}: {
+  trip: Trip;
+  isOwner: boolean;
+  onDeleteRequest: () => void;
+  onLeaveRequest: () => void;
+}) {
   const { updateTrip } = useTrips();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
@@ -289,25 +305,46 @@ function TripCard({ trip, onDeleteRequest }: { trip: Trip; onDeleteRequest: () =
         )}
       </div>
 
-      {/* Delete button — revealed on hover */}
-      <button
-        onClick={(e) => { 
-          e.preventDefault(); 
-          e.stopPropagation(); 
-          onDeleteRequest(); 
-        }}
-        title="Delete Trip"
-        className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 font-mono text-[10px] px-1.5 py-0.5 game-btn z-10"
-        style={{
-          background: "#8b1a1a",
-          color: "#fde8e8",
-          border: "2px solid #1a0f06",
-          boxShadow: "2px 2px 0 #1a0f06",
-          transition: "opacity 150ms",
-        }}
-      >
-        🗑
-      </button>
+      {/* Delete (owner) or Leave (member) button — revealed on hover */}
+      {isOwner ? (
+        <button
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onDeleteRequest();
+          }}
+          title="Delete Trip"
+          className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 font-mono text-[10px] px-1.5 py-0.5 game-btn z-10"
+          style={{
+            background: "#8b1a1a",
+            color: "#fde8e8",
+            border: "2px solid #1a0f06",
+            boxShadow: "2px 2px 0 #1a0f06",
+            transition: "opacity 150ms",
+          }}
+        >
+          🗑
+        </button>
+      ) : (
+        <button
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onLeaveRequest();
+          }}
+          title="Leave Trip"
+          className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 font-pixel text-[7px] uppercase px-1.5 py-0.5 game-btn z-10"
+          style={{
+            background: "#7c5c1a",
+            color: "#fef3c7",
+            border: "2px solid #1a0f06",
+            boxShadow: "2px 2px 0 #1a0f06",
+            transition: "opacity 150ms",
+          }}
+        >
+          ↩ Leave
+        </button>
+      )}
     </div>
   );
 }

@@ -78,7 +78,7 @@ export default function InvitePage({ params }: { params: Promise<{ tripId: strin
 
       if (existing) {
         setStatus("already_member");
-        setTimeout(() => router.push(`/trip/${tripId}`), 1800);
+        setTimeout(() => { window.location.href = `/trip/${tripId}`; }, 1800);
         return;
       }
 
@@ -114,7 +114,9 @@ export default function InvitePage({ params }: { params: Promise<{ tripId: strin
       }
 
       setStatus("success");
-      setTimeout(() => router.push(`/trip/${tripId}`), 2000);
+      // Hard redirect (not soft push) so the browser re-fetches with fresh
+      // Supabase session cookies and the new trip_members RLS permissions apply.
+      setTimeout(() => { window.location.href = `/trip/${tripId}`; }, 2000);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       setErrorMsg(msg);
