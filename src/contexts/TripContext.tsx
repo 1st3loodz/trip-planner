@@ -87,37 +87,47 @@ export function TripProvider({ children }: { children: React.ReactNode }) {
       if (!mounted) return;
       setUserId(uid);
 
+      // ── Step 1: get all trip_ids this user is a member of ─────────────────
       const { data: memberRows } = await supabase
         .from("trip_members")
         .select("trip_id")
         .eq("user_id", uid);
 
-      const tripIds = memberRows ? memberRows.map((r: any) => r.trip_id) : [];
+      const joinedTripIds: string[] = memberRows ? memberRows.map((r: any) => r.trip_id) : [];
 
-      let query = supabase
+      const SELECT_COLS = `id, title, destination, start_date, end_date, total_days, status, travel_type, base_currency, created_by, days, expenses, custom_categories`;
+
+      // ── Step 2a: trips the user created (passes RLS creator filter) ────────
+      const { data: createdTrips } = await supabase
         .from("trips")
-        .select(`
-          id, title, destination, start_date, end_date, total_days, status, travel_type, base_currency, created_by, days, expenses, custom_categories
-        `)
+        .select(SELECT_COLS)
+        .eq("created_by", uid)
         .order("start_date", { ascending: false });
 
-      if (tripIds.length > 0) {
-        query = query.or(`created_by.eq.${uid},id.in.(${tripIds.join(',')})`);
-      } else {
-        query = query.eq("created_by", uid);
+      // ── Step 2b: trips the user joined via invite link (fetch by ID list) ──
+      // Fetching by explicit ID bypasses the "created_by" RLS ownership check.
+      let joinedTrips: any[] = [];
+      if (joinedTripIds.length > 0) {
+        const { data: joinedData } = await supabase
+          .from("trips")
+          .select(SELECT_COLS)
+          .in("id", joinedTripIds)
+          .order("start_date", { ascending: false });
+        if (joinedData) joinedTrips = joinedData;
       }
 
-      const { data: fetchedTrips, error: tripsErr } = await query;
+      // ── Step 3: merge & deduplicate by id ─────────────────────────────────
+      const allRows = [...(createdTrips || []), ...joinedTrips];
+      const seen = new Set<string>();
+      const fetchedTrips = allRows.filter((t) => {
+        if (seen.has(t.id)) return false;
+        seen.add(t.id);
+        return true;
+      });
 
       if (!mounted) return;
 
-      if (tripsErr) {
-        console.error("[TripProvider] Failed to fetch trips:", tripsErr.message, tripsErr.details);
-        setIsLoaded(true);
-        return;
-      }
-
-      if (!fetchedTrips || fetchedTrips.length === 0) {
+      if (fetchedTrips.length === 0) {
         setTrips([]);
         setIsLoaded(true);
         return;
