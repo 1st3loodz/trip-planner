@@ -16,9 +16,9 @@ interface TripHeaderProps {
 
 export default function TripHeader({ trip, activeTab, onTabChange, onManageMembers, onRefreshRequest }: TripHeaderProps) {
   const [showEditModal,   setShowEditModal]   = useState(false);
-  const [isEditingNotes, setIsEditingNotes]  = useState(false);
-  const [notesText,      setNotesText]       = useState(trip.notes ?? "");
-  const [isSavingNotes,  setIsSavingNotes]   = useState(false);
+  const [isEditingNotice, setIsEditingNotice]  = useState(false);
+  const [noticeText,      setNoticeText]       = useState(trip.notice ?? "");
+  const [isSavingNotice,  setIsSavingNotice]   = useState(false);
   const [linkCopied,     setLinkCopied]      = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -31,10 +31,10 @@ export default function TripHeader({ trip, activeTab, onTabChange, onManageMembe
   };
   const { updateTrip } = useTrips();
 
-  // Sync notesText whenever the parent trip prop refreshes
+  // Sync noticeText whenever the parent trip prop refreshes
   useEffect(() => {
-    setNotesText(trip.notes ?? "");
-  }, [trip.notes]);
+    setNoticeText(trip.notice ?? "");
+  }, [trip.notice]);
 
   const handleSaveTrip = async (data: { title: string; destination: string; startDate: string; endDate: string }) => {
     const formatToISO = (dateStr: string) => {
@@ -55,25 +55,32 @@ export default function TripHeader({ trip, activeTab, onTabChange, onManageMembe
     onRefreshRequest();
   };
 
-  const handleSaveNotes = async () => {
-    setIsSavingNotes(true);
+  const handleSaveNotice = async () => {
+    setIsSavingNotice(true);
     try {
       const supabase = createClient();
-      await supabase
+      const { error } = await supabase
         .from("trips")
-        .update({ notice: notesText.trim() || null })
+        .update({ notice: noticeText.trim() || null })
         .eq("id", trip.id);
-      setIsEditingNotes(false);
+
+      if (error) {
+        console.error("[TripHeader] Supabase update failed for notice:", error);
+        alert(`Failed to save notice: ${error.message}`);
+        setIsSavingNotice(false);
+        return;
+      }
+      setIsEditingNotice(false);
       onRefreshRequest();
     } catch (err) {
-      console.error("[TripHeader] Failed to save notes:", err);
+      console.error("[TripHeader] Failed to save notice:", err);
     } finally {
-      setIsSavingNotes(false);
+      setIsSavingNotice(false);
     }
   };
 
   const handleStartEdit = () => {
-    setIsEditingNotes(true);
+    setIsEditingNotice(true);
     // Focus textarea on next paint
     setTimeout(() => textareaRef.current?.focus(), 50);
   };
@@ -197,21 +204,21 @@ export default function TripHeader({ trip, activeTab, onTabChange, onManageMembe
               📝 Trip Notice
             </span>
             <div className="flex items-center gap-2">
-              {isEditingNotes ? (
+              {isEditingNotice ? (
                 <>
                   <button
-                    onClick={() => { setIsEditingNotes(false); setNotesText(trip.notes ?? ""); }}
-                    disabled={isSavingNotes}
+                    onClick={() => { setIsEditingNotice(false); setNoticeText(trip.notice ?? ""); }}
+                    disabled={isSavingNotice}
                     className="game-btn px-2.5 py-1 font-pixel text-[7px] uppercase tracking-wider border-2 border-stone-800 bg-[#fdfbf7] text-stone-800 dark:border-[#54463d] dark:bg-[#28211d] dark:text-[#fdfbf7] disabled:opacity-50"
                   >
                     ✕ Cancel
                   </button>
                   <button
-                    onClick={handleSaveNotes}
-                    disabled={isSavingNotes}
+                    onClick={handleSaveNotice}
+                    disabled={isSavingNotice}
                     className="game-btn px-2.5 py-1 font-pixel text-[7px] uppercase tracking-wider bg-[#4a7c59] text-[#fdfbf7] dark:bg-[#2d5a3d] disabled:opacity-50"
                   >
-                    {isSavingNotes ? "Saving..." : "💾 Save"}
+                    {isSavingNotice ? "Saving..." : "💾 Save"}
                   </button>
                 </>
               ) : (
@@ -227,17 +234,17 @@ export default function TripHeader({ trip, activeTab, onTabChange, onManageMembe
 
           {/* Notes body */}
           <div className="px-4 py-3">
-            {isEditingNotes ? (
+            {isEditingNotice ? (
               <textarea
                 ref={textareaRef}
-                value={notesText}
-                onChange={(e) => setNotesText(e.target.value)}
+                value={noticeText}
+                onChange={(e) => setNoticeText(e.target.value)}
                 placeholder="Write a shared announcement, reminders, or notes for your travel crew..."
                 rows={4}
                 className="w-full resize-y border-2 border-stone-400 bg-[#fdfbf7] px-3 py-2.5 font-mono text-xs text-stone-900 placeholder-stone-400 outline-none focus:border-stone-800 dark:border-stone-600 dark:bg-[#28211d] dark:text-[#fdfbf7] dark:placeholder-stone-500 dark:focus:border-[#f5ebd5]"
               />
-            ) : notesText.trim() ? (
-              <p className="font-mono text-xs leading-relaxed text-stone-700 dark:text-[#f5ebd5] whitespace-pre-wrap">{notesText}</p>
+            ) : noticeText.trim() ? (
+              <p className="font-mono text-xs leading-relaxed text-stone-700 dark:text-[#f5ebd5] whitespace-pre-wrap">{noticeText}</p>
             ) : (
               <p className="font-mono text-[10px] italic text-stone-400 dark:text-stone-500">
                 No announcements yet. Click ✎ Edit Note to add a shared message for your crew.

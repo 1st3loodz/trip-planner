@@ -92,7 +92,7 @@ export default function TripDetailPage({ params }: { params: Promise<{ tripId: s
             title:            tripData?.title            || prev.title,
             startDate:        tripData?.start_date       || prev.startDate,
             endDate:          tripData?.end_date         || prev.endDate,
-            notes:            tripData?.notice           !== undefined ? tripData.notice : prev.notes,
+            notice:           tripData?.notice           !== undefined ? tripData.notice : prev.notice,
             participants:     mergedCompanions,
             days:             tripData?.days             || prev.days,
             expenses:         tripData?.expenses         || prev.expenses,

@@ -146,7 +146,7 @@ export interface Trip {
   customCategories?: CustomCategory[];
   travelType?: "solo" | "group";
   baseCurrency?: Currency;
-  notes?: string;
+  notice?: string;
   /** UUID of the user who created this trip — used for ownership checks */
   createdBy?: string;
 }
