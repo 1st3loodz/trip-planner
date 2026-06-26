@@ -61,7 +61,7 @@ export default function TripHeader({ trip, activeTab, onTabChange, onManageMembe
       const supabase = createClient();
       await supabase
         .from("trips")
-        .update({ notes: notesText.trim() || null })
+        .update({ notice: notesText.trim() || null })
         .eq("id", trip.id);
       setIsEditingNotes(false);
       onRefreshRequest();
