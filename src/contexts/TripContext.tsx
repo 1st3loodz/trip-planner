@@ -117,12 +117,10 @@ export function TripProvider({ children }: { children: React.ReactNode }) {
       //     )
       //   );
       // ─────────────────────────────────────────────────────────────────────
-      const SELECT_COLS = `id, title, destination, start_date, end_date, total_days, status, travel_type, base_currency, created_by, notes, days, expenses, custom_categories`;
-
       // ── Step 2a: trips the user created ───────────────────────────────────
       const { data: createdTrips, error: createdErr } = await supabase
         .from("trips")
-        .select(SELECT_COLS)
+        .select('*')
         .eq("created_by", uid)
         .order("start_date", { ascending: false });
 
@@ -135,7 +133,7 @@ export function TripProvider({ children }: { children: React.ReactNode }) {
       if (joinedTripIds.length > 0) {
         const { data: joinedData, error: joinedErr } = await supabase
           .from("trips")
-          .select(SELECT_COLS)
+          .select('*')
           .in("id", joinedTripIds)
           .order("start_date", { ascending: false });
 
@@ -246,9 +244,7 @@ export function TripProvider({ children }: { children: React.ReactNode }) {
         if (payload.eventType === "INSERT") {
           const { data } = await supabase
             .from("trips")
-            .select(`
-              id, title, destination, start_date, end_date, total_days, status, travel_type, base_currency, created_by, days, expenses, custom_categories
-            `)
+            .select('*')
             .eq("id", payload.new.id)
             .single();
           if (data) {

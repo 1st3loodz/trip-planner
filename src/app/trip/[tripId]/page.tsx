@@ -67,7 +67,7 @@ export default function TripDetailPage({ params }: { params: Promise<{ tripId: s
 
       const { data: tripData } = await supabase
         .from("trips")
-        .select("title, start_date, end_date, notes, days, expenses, custom_categories")
+        .select("*")
         .eq("id", tripId)
         .single();
 
