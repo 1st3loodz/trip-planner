@@ -34,11 +34,11 @@ export default function ExpenseCard({ expense, participants, onEdit, onDelete, c
         <div className="flex items-center gap-1.5 shrink-0">
           <span className={`font-mono text-base font-black tabular-nums text-stone-800 dark:text-[#fdfbf7] ${expense.isExcluded ? 'line-through opacity-70' : ''}`}>{formatCurrency(expense.amount, expense.currency)}</span>
           <button onClick={() => onEdit(expense)} title="Edit expense"
-            className="flex h-7 w-7 items-center justify-center border-2 border-stone-300 bg-[#fdfbf7] text-stone-500 opacity-0 transition-all group-hover:opacity-100 hover:border-stone-800 hover:bg-[#f5eed7] hover:text-stone-800 dark:border-[#54463d] dark:bg-[#28211d] dark:text-stone-500 dark:hover:border-stone-600 dark:hover:bg-[#362d28] dark:hover:text-[#fdfbf7]">
+            className="flex h-7 w-7 items-center justify-center border-2 border-stone-300 bg-[#fdfbf7] text-stone-500 opacity-100 transition-all md:opacity-0 md:group-hover:opacity-100 hover:border-stone-800 hover:bg-[#f5eed7] hover:text-stone-800 dark:border-[#54463d] dark:bg-[#28211d] dark:text-stone-500 dark:hover:border-stone-600 dark:hover:bg-[#362d28] dark:hover:text-[#fdfbf7]">
             <PencilIcon />
           </button>
           <button onClick={() => onDelete(expense.id)} title="Delete expense"
-            className="flex h-7 w-7 items-center justify-center border-2 border-red-200 bg-red-50 text-red-500 opacity-0 transition-all group-hover:opacity-100 hover:border-red-400 hover:bg-red-100 hover:text-red-700 dark:border-red-900/50 dark:bg-red-900/20 dark:text-red-400 dark:hover:border-red-800 dark:hover:bg-red-900/40 dark:hover:text-red-300">
+            className="flex h-7 w-7 items-center justify-center border-2 border-red-200 bg-red-50 text-red-500 opacity-100 transition-all md:opacity-0 md:group-hover:opacity-100 hover:border-red-400 hover:bg-red-100 hover:text-red-700 dark:border-red-900/50 dark:bg-red-900/20 dark:text-red-400 dark:hover:border-red-800 dark:hover:bg-red-900/40 dark:hover:text-red-300">
             <TrashIcon />
           </button>
         </div>

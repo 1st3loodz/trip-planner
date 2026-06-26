@@ -117,8 +117,8 @@ export default function ActivityRow({ activity, destination, isLast, onEdit, onD
         )}
       </div>
 
-      {/* Edit / Delete — revealed on hover */}
-      <div className="flex shrink-0 items-start gap-1 pt-1 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+      {/* Edit / Delete — revealed on hover (desktop), always visible (mobile) */}
+      <div className="flex shrink-0 items-start gap-1 pt-1 opacity-100 transition-opacity duration-150 md:opacity-0 md:group-hover:opacity-100">
         <button
           onClick={() => onEdit(activity)}
           title="Edit"

@@ -63,6 +63,7 @@ function dbRowToTrip(row: any, participants: any[] = []): Trip {
     travelType:       row.travel_type     ?? "solo",
     baseCurrency:     row.base_currency   ?? "THB",
     createdBy:        row.created_by      ?? undefined,
+    notes:            row.notes           ?? undefined,
     participants:     participants,
     days:             row.days            ?? [],
     expenses:         row.expenses        ?? [],
@@ -116,7 +117,7 @@ export function TripProvider({ children }: { children: React.ReactNode }) {
       //     )
       //   );
       // ─────────────────────────────────────────────────────────────────────
-      const SELECT_COLS = `id, title, destination, start_date, end_date, total_days, status, travel_type, base_currency, created_by, days, expenses, custom_categories`;
+      const SELECT_COLS = `id, title, destination, start_date, end_date, total_days, status, travel_type, base_currency, created_by, notes, days, expenses, custom_categories`;
 
       // ── Step 2a: trips the user created ───────────────────────────────────
       const { data: createdTrips, error: createdErr } = await supabase
