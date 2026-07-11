@@ -28,6 +28,7 @@ export default function IndividualSummary({ expenses, participants, customCatego
 
   const [selectedId, setSelectedId] = useState<string>(participants[0]?.id ?? "");
   const [catFilter,  setCatFilter]  = useState<CatFilter>(ALL_CATEGORY);
+  const [expandedDays, setExpandedDays] = useState<Record<string, boolean>>({});
 
   const member = participants.find((p) => p.id === selectedId);
 
@@ -211,20 +212,31 @@ export default function IndividualSummary({ expenses, participants, customCatego
           {groups.map(({ date, items }) => {
             const dayTotals   = getDayTotals(items);
             const dayTotalBase = getDayTotalBase(items);
+            const isExpanded = !!expandedDays[date];
             return (
               <div key={date} className="overflow-hidden border-2 border-stone-400 bg-[#fdfbf7] dark:border-[#54463d] dark:bg-[#28211d]">
                 {/* Date header */}
-                <div className="flex items-center justify-between border-b-2 border-stone-400 bg-[#f5eed7] px-4 py-2.5 dark:border-[#54463d] dark:bg-[#362d28]">
+                <button
+                  onClick={() => setExpandedDays((prev) => ({ ...prev, [date]: !prev[date] }))}
+                  className="w-full flex items-center justify-between border-b-2 border-stone-400 bg-[#f5eed7] px-4 py-3 dark:border-[#54463d] dark:bg-[#362d28] hover:bg-[#e8dcc4] dark:hover:bg-[#4a3f38] transition-colors"
+                >
                   <div className="flex items-center gap-2">
                     <span>📅</span>
                     <span className="font-mono text-xs font-bold text-stone-800 dark:text-[#fdfbf7]">{formatDate(date)}</span>
                   </div>
-                  <span className="font-mono text-[10px] font-bold text-stone-700 dark:text-stone-300">
-                    ≈ {formatBase(dayTotalBase, baseCurrency)}
-                  </span>
-                </div>
+                  <div className="flex items-center gap-3">
+                    <span className="font-mono text-[10px] font-bold text-stone-700 dark:text-stone-300">
+                      ≈ {formatBase(dayTotalBase, baseCurrency)}
+                    </span>
+                    <span className="text-stone-600 dark:text-stone-400 text-xs">
+                      {isExpanded ? "▲" : "▼"}
+                    </span>
+                  </div>
+                </button>
 
-                {/* Expense rows */}
+                {isExpanded && (
+                  <>
+                    {/* Expense rows */}
                 <div className="divide-y-2 divide-stone-200 dark:divide-stone-700">
                   {items.map(({ expense, share, isPersonal }) => {
                     const customCat = customCategories.find(c => c.id === expense.category);
@@ -304,6 +316,8 @@ export default function IndividualSummary({ expenses, participants, customCatego
                     </span>
                   </div>
                 </div>
+                  </>
+                )}
               </div>
             );
           })}
