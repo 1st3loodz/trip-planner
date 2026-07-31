@@ -258,12 +258,25 @@ export default function TripDetailPage({ params }: { params: Promise<{ tripId: s
     setRefreshToggle(prev => prev + 1);
   }, [trip, updateTrip]);
 
-  const handleEditActivity = useCallback(async (dayNumber: number, updated: ActivityItem) => {
+  const handleEditActivity = useCallback(async (newDayNumber: number, updated: ActivityItem) => {
     if (!trip) return;
-    const newDays = trip.days.map((day) => {
-      if (day.dayNumber !== dayNumber) return day;
-      return { ...day, activities: day.activities.map((a) => a.id === updated.id ? updated : a).sort((a, b) => a.time.localeCompare(b.time)) };
+
+    // Step 1: Remove the activity from whichever day currently holds it (search by ID).
+    // This correctly handles day-change edits where the source day ≠ newDayNumber.
+    const withRemoved = trip.days.map((day) => ({
+      ...day,
+      activities: day.activities.filter((a) => a.id !== updated.id),
+    }));
+
+    // Step 2: Insert the updated activity into the target day and re-sort by time.
+    const newDays = withRemoved.map((day) => {
+      if (day.dayNumber !== newDayNumber) return day;
+      return {
+        ...day,
+        activities: [...day.activities, updated].sort((a, b) => a.time.localeCompare(b.time)),
+      };
     });
+
     await updateTrip(trip.id, { days: newDays });
     setRefreshToggle(prev => prev + 1);
   }, [trip, updateTrip]);
