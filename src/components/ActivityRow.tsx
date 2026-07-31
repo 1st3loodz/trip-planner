@@ -76,7 +76,7 @@ export default function ActivityRow({ activity, destination, isLast, onEdit, onD
           {activity.title}
         </h3>
         {activity.description && (
-          <p className="mb-1.5 font-mono text-xs leading-relaxed text-stone-600 dark:text-[#f5ebd5]">{activity.description}</p>
+          <p className="mb-1.5 whitespace-pre-line font-mono text-xs leading-relaxed text-stone-600 dark:text-[#f5ebd5]">{activity.description}</p>
         )}
         {activity.location && (
           <div className="mb-1.5">
