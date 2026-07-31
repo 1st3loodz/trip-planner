@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Trip, ActivityItem, ActivityCategory } from "@/types/trip";
+import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
+import { Trip, ActivityItem, ActivityCategory, DayPlan } from "@/types/trip";
 import { ACTIVITY_CATEGORY_META } from "@/lib/utils";
 import DayCard from "@/components/DayCard";
 import AddActivityModal from "@/components/AddActivityModal";
@@ -12,6 +13,7 @@ interface ItineraryTabProps {
   onAddActivity:    (dayNumber: number, activity: ActivityItem) => Promise<void> | void;
   onEditActivity:   (dayNumber: number, activity: ActivityItem) => Promise<void> | void;
   onDeleteActivity: (dayNumber: number, activityId: string) => void;
+  onReorderDays:    (reorderedDays: DayPlan[]) => Promise<void> | void;
   customCategories: { id: string; label: string; emoji: string }[];
   onAddCustomCategory: (cat: { id: string; label: string; emoji: string }) => void;
   setRefreshToggle?: React.Dispatch<React.SetStateAction<number>>;
@@ -20,16 +22,19 @@ interface ItineraryTabProps {
 type Filter = ActivityCategory | "all";
 type ModalState = null | { mode: "add" } | { mode: "edit"; activity: ActivityItem; dayNumber: number };
 
-export default function ItineraryTab({ trip, onAddActivity, onEditActivity, onDeleteActivity, customCategories, onAddCustomCategory, setRefreshToggle }: ItineraryTabProps) {
-  const [filter,         setFilter]         = useState<Filter>("all");
-  const [modalState,     setModalState]     = useState<ModalState>(null);
-  const [showActualLog,  setShowActualLog]  = useState<boolean>(false);
+export default function ItineraryTab({ trip, onAddActivity, onEditActivity, onDeleteActivity, onReorderDays, customCategories, onAddCustomCategory, setRefreshToggle }: ItineraryTabProps) {
+  const [filter,        setFilter]        = useState<Filter>("all");
+  const [modalState,    setModalState]    = useState<ModalState>(null);
+  const [showActualLog, setShowActualLog] = useState<boolean>(false);
 
   const allActivities = trip.days.flatMap((d) => d.activities);
   const counts: Partial<Record<Filter, number>> = { all: allActivities.length };
   allActivities.forEach((a) => { counts[a.category] = (counts[a.category] ?? 0) + 1; });
   const presentCats = (Object.keys(ACTIVITY_CATEGORY_META) as ActivityCategory[]).filter((c) => counts[c]);
   const presentCustomCats = customCategories.filter((c) => counts[c.id]);
+
+  // When filtering we show a flat filtered view without drag-to-reorder
+  const isFiltering = filter !== "all";
 
   const visibleDays = trip.days
     .map((day) => ({ ...day, activities: filter === "all" ? day.activities : day.activities.filter((a) => a.category === filter) }))
@@ -40,9 +45,23 @@ export default function ItineraryTab({ trip, onAddActivity, onEditActivity, onDe
     else onAddActivity(dayNumber, activity);
   }
 
+  function handleDragEnd(result: DropResult) {
+    if (!result.destination) return;
+    const { source, destination } = result;
+    if (source.index === destination.index) return;
+
+    // Reorder a shallow copy of the days array
+    const reordered = Array.from(trip.days);
+    const [moved] = reordered.splice(source.index, 1);
+    reordered.splice(destination.index, 0, moved);
+
+    // Persist new order — caller will renumber dayNumber fields
+    onReorderDays(reordered);
+  }
+
   return (
     <div>
-      {/* ── Sub-Icon Toggle: Actual Log (Above Add Entry) ────────────────── */}
+      {/* ── Sub-Icon Toggle: Actual Log ────────────────────────────────── */}
       <div className="mb-4 flex">
         <button
           onClick={() => setShowActualLog(prev => !prev)}
@@ -85,28 +104,80 @@ export default function ItineraryTab({ trip, onAddActivity, onEditActivity, onDe
         </div>
       </div>
 
+      {/* Drag hint */}
+      {!isFiltering && visibleDays.length > 1 && (
+        <p className="mb-3 font-mono text-[10px] text-stone-500 dark:text-stone-400 flex items-center gap-1.5">
+          <span>⠿</span> Hold the grip handle to reorder days
+        </p>
+      )}
+
       {visibleDays.length > 0 ? (
-        visibleDays.map((day, idx) => (
-          <DayCard
-            key={day.dayNumber}
-            day={day}
-            destination={trip.destination}
-            defaultOpen={false}
-            customCategories={customCategories}
-            onEditActivity={(dayNumber, activity) => setModalState({ mode: "edit", activity, dayNumber })}
-            onDeleteActivity={onDeleteActivity}
-          />
-        ))
+        isFiltering ? (
+          // Plain list when a category filter is active (no DnD while filtering)
+          visibleDays.map((day) => (
+            <DayCard
+              key={day.dayNumber}
+              day={day}
+              destination={trip.destination}
+              defaultOpen={false}
+              customCategories={customCategories}
+              onEditActivity={(dayNumber, activity) => setModalState({ mode: "edit", activity, dayNumber })}
+              onDeleteActivity={onDeleteActivity}
+            />
+          ))
+        ) : (
+          <DragDropContext onDragEnd={handleDragEnd}>
+            <Droppable droppableId="days-list">
+              {(provided) => (
+                <div
+                  ref={provided.innerRef}
+                  {...provided.droppableProps}
+                >
+                  {visibleDays.map((day, idx) => (
+                    <Draggable key={String(day.dayNumber)} draggableId={String(day.dayNumber)} index={idx}>
+                      {(dragProvided, dragSnapshot) => (
+                        <div
+                          ref={dragProvided.innerRef}
+                          {...dragProvided.draggableProps}
+                          style={{
+                            ...dragProvided.draggableProps.style,
+                            opacity: dragSnapshot.isDragging ? 0.85 : 1,
+                            transform: dragSnapshot.isDragging
+                              ? `${dragProvided.draggableProps.style?.transform ?? ""} rotate(1.5deg)`
+                              : dragProvided.draggableProps.style?.transform,
+                            boxShadow: dragSnapshot.isDragging
+                              ? "6px 6px 0 #292524"
+                              : undefined,
+                            zIndex: dragSnapshot.isDragging ? 50 : undefined,
+                          }}
+                        >
+                          <DayCard
+                            day={day}
+                            destination={trip.destination}
+                            defaultOpen={false}
+                            customCategories={customCategories}
+                            dragHandleProps={dragProvided.dragHandleProps}
+                            onEditActivity={(dayNumber, activity) => setModalState({ mode: "edit", activity, dayNumber })}
+                            onDeleteActivity={onDeleteActivity}
+                          />
+                        </div>
+                      )}
+                    </Draggable>
+                  ))}
+                  {provided.placeholder}
+                </div>
+              )}
+            </Droppable>
+          </DragDropContext>
+        )
       ) : (
-        <div
-          className="py-16 text-center border-2 border-dashed border-stone-400 bg-stone-200/50 dark:border-stone-600 dark:bg-stone-800/30"
-        >
+        <div className="py-16 text-center border-2 border-dashed border-stone-400 bg-stone-200/50 dark:border-stone-600 dark:bg-stone-800/30">
           <div className="mb-2 text-4xl">🔍</div>
           <p className="font-mono text-xs text-stone-600 dark:text-[#f5ebd5]">No entries match this filter.</p>
         </div>
       )}
 
-      {/* ── Modals ───────────────────────────────────────────────────────────── */}
+      {/* ── Modals ─────────────────────────────────────────────────────────────── */}
       {modalState !== null && (
         <AddActivityModal
           days={trip.days}

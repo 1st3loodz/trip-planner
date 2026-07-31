@@ -304,6 +304,17 @@ export default function TripDetailPage({ params }: { params: Promise<{ tripId: s
     setRefreshToggle(prev => prev + 1);
   }, [trip, updateTrip]);
 
+  // ── Day Reordering (Drag-and-Drop) ────────────────────────────────────────
+  const handleReorderDays = useCallback(async (reorderedDays: import("@/types/trip").DayPlan[]) => {
+    if (!trip) return;
+    // Renumber dayNumber fields to match new visual positions (1-based)
+    const renumbered = reorderedDays.map((day, idx) => ({ ...day, dayNumber: idx + 1 }));
+    // Optimistic local update first
+    setLocalTrip((prev) => prev ? { ...prev, days: renumbered } : prev);
+    // Then persist to Supabase via updateTrip
+    await updateTrip(trip.id, { days: renumbered });
+  }, [trip, updateTrip, setLocalTrip]);
+
   if (!isLoaded) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#f4ecd8] dark:bg-[#28211d]">
@@ -378,6 +389,7 @@ export default function TripDetailPage({ params }: { params: Promise<{ tripId: s
             onAddActivity={handleAddActivity}
             onEditActivity={handleEditActivity}
             onDeleteActivity={handleDeleteActivity}
+            onReorderDays={handleReorderDays}
             customCategories={trip.customCategories || []}
             onAddCustomCategory={handleAddCustomCategory}
             setRefreshToggle={setRefreshToggle}
