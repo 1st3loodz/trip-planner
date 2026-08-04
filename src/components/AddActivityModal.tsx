@@ -50,6 +50,8 @@ export default function AddActivityModal({ days, startDate, endDate, initialActi
   const [dayNumber,    setDayNumber]    = useState(initialActivity?.dayNumber ?? days[0]?.dayNumber ?? 1);
   const [hour,         setHour]         = useState(initialActivity?.time?.split(':')[0] ?? "09");
   const [minute,       setMinute]       = useState(initialActivity?.time?.split(':')[1] ?? "00");
+  const [endHour,      setEndHour]      = useState(initialActivity?.endTime?.split(':')[0] ?? "");
+  const [endMinute,    setEndMinute]    = useState(initialActivity?.endTime?.split(':')[1] ?? "00");
   const [title,        setTitle]        = useState(initialActivity?.title ?? "");
   const [description,  setDescription]  = useState(initialActivity?.description ?? "");
   // ── Candidate locations array ─────────────────────────────────────────────
@@ -98,6 +100,7 @@ export default function AddActivityModal({ days, startDate, endDate, initialActi
     await onSave(dayNumber, {
       id: initialActivity?.id ?? `act-${generateId()}`,
       time: `${hour}:${minute}`,
+      endTime: endHour ? `${endHour}:${endMinute}` : undefined,
       title: title.trim(),
       description: description.trim() || undefined,
       locations: locations.filter(l => l.name.trim()),
@@ -142,50 +145,83 @@ export default function AddActivityModal({ days, startDate, endDate, initialActi
 
         {/* Body */}
         <div className="max-h-[75vh] overflow-y-auto px-6 py-5 space-y-5">
+          {/* Day selector */}
+          <div>
+            <label className="mb-1.5 block font-pixel text-[8px] uppercase tracking-widest text-stone-600 dark:text-stone-400">Day *</label>
+            <select value={dayNumber} onChange={(e) => setDayNumber(Number(e.target.value))}
+              className="w-full border-2 border-stone-400 bg-[#fdfbf7] px-3.5 py-2.5 font-mono text-sm text-stone-900 outline-none focus:border-stone-800 dark:border-stone-600 dark:bg-[#1e1815] dark:text-[#fdfbf7]">
+              {Array.from({ length: totalDays }, (_, i) => i + 1).map(dayNum => {
+                const d = days.find(x => x.dayNumber === dayNum);
+                const baseDate = parseDateStrict(startDate);
+                const itemDate = new Date(baseDate);
+                itemDate.setDate(baseDate.getDate() + (dayNum - 1));
+                const displayDD = String(itemDate.getDate()).padStart(2, '0');
+                const displayMM = String(itemDate.getMonth() + 1).padStart(2, '0');
+                const displayYYYY = itemDate.getFullYear();
+                const formattedStr = `${displayDD}/${displayMM}/${displayYYYY}`;
+                return <option key={dayNum} value={dayNum}>Day {dayNum} ({formattedStr}){d?.label ? ` — ${d.label}` : ""}</option>;
+              })}
+            </select>
+            {selectedDay && <p className="mt-1 font-mono text-[10px] text-stone-400 dark:text-stone-600">{new Date(selectedDay.date + "T00:00:00").toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}</p>}
+          </div>
+
+          {/* Start Time + End Time row */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1.5 block font-pixel text-[8px] uppercase tracking-widest text-stone-600 dark:text-stone-400">Day *</label>
-              <select value={dayNumber} onChange={(e) => setDayNumber(Number(e.target.value))}
-                className="w-full border-2 border-stone-400 bg-[#fdfbf7] px-3.5 py-2.5 font-mono text-sm text-stone-900 outline-none focus:border-stone-800 dark:border-stone-600 dark:bg-[#1e1815] dark:text-[#fdfbf7]">
-                {Array.from({ length: totalDays }, (_, i) => i + 1).map(dayNum => {
-                  const d = days.find(x => x.dayNumber === dayNum);
-                  
-                  const baseDate = parseDateStrict(startDate);
-                  const itemDate = new Date(baseDate);
-                  itemDate.setDate(baseDate.getDate() + (dayNum - 1));
-                  const displayDD = String(itemDate.getDate()).padStart(2, '0');
-                  const displayMM = String(itemDate.getMonth() + 1).padStart(2, '0');
-                  const displayYYYY = itemDate.getFullYear();
-                  const formattedStr = `${displayDD}/${displayMM}/${displayYYYY}`;
-                  
-                  return <option key={dayNum} value={dayNum}>Day {dayNum} ({formattedStr}){d?.label ? ` — ${d.label}` : ""}</option>;
-                })}
-              </select>
-              {selectedDay && <p className="mt-1 font-mono text-[10px] text-stone-400 dark:text-stone-600">{new Date(selectedDay.date + "T00:00:00").toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}</p>}
-            </div>
-            <div>
-              <label className="mb-1.5 block font-pixel text-[8px] uppercase tracking-widest text-stone-600 dark:text-stone-400">Time *</label>
-              <div className="flex gap-2">
-                <select 
-                  value={hour} 
-                  onChange={(e) => setHour(e.target.value)}
-                  className="w-full border-2 border-stone-400 bg-[#fdfbf7] px-3.5 py-2.5 font-mono text-sm text-stone-900 outline-none focus:border-stone-800 dark:border-stone-600 dark:bg-[#1e1815] dark:text-[#fdfbf7]"
-                >
+              <label className="mb-1.5 block font-pixel text-[8px] uppercase tracking-widest text-stone-600 dark:text-stone-400">Start Time *</label>
+              <div className="flex gap-1.5">
+                <select value={hour} onChange={(e) => setHour(e.target.value)}
+                  className="w-full border-2 border-stone-400 bg-[#fdfbf7] px-2.5 py-2.5 font-mono text-sm text-stone-900 outline-none focus:border-stone-800 dark:border-stone-600 dark:bg-[#1e1815] dark:text-[#fdfbf7]">
                   {Array.from({ length: 24 }, (_, i) => i.toString().padStart(2, '0')).map(h => (
                     <option key={h} value={h}>{h}</option>
                   ))}
                 </select>
                 <span className="flex items-center font-pixel text-stone-900 dark:text-[#fdfbf7]">:</span>
-                <select 
-                  value={minute} 
-                  onChange={(e) => setMinute(e.target.value)}
-                  className="w-full border-2 border-stone-400 bg-[#fdfbf7] px-3.5 py-2.5 font-mono text-sm text-stone-900 outline-none focus:border-stone-800 dark:border-stone-600 dark:bg-[#1e1815] dark:text-[#fdfbf7]"
+                <select value={minute} onChange={(e) => setMinute(e.target.value)}
+                  className="w-full border-2 border-stone-400 bg-[#fdfbf7] px-2.5 py-2.5 font-mono text-sm text-stone-900 outline-none focus:border-stone-800 dark:border-stone-600 dark:bg-[#1e1815] dark:text-[#fdfbf7]">
+                  {Array.from({ length: 12 }, (_, i) => (i * 5).toString().padStart(2, '0')).map(m => (
+                    <option key={m} value={m}>{m}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label className="mb-1.5 block font-pixel text-[8px] uppercase tracking-widest text-stone-600 dark:text-stone-400">
+                End Time <span className="normal-case font-mono text-[9px] text-stone-400">(optional)</span>
+              </label>
+              <div className="flex gap-1.5">
+                <select
+                  value={endHour}
+                  onChange={(e) => setEndHour(e.target.value)}
+                  className="w-full border-2 border-stone-400 bg-[#fdfbf7] px-2.5 py-2.5 font-mono text-sm text-stone-900 outline-none focus:border-stone-800 dark:border-stone-600 dark:bg-[#1e1815] dark:text-[#fdfbf7]"
+                >
+                  <option value="">--</option>
+                  {Array.from({ length: 24 }, (_, i) => i.toString().padStart(2, '0')).map(h => (
+                    <option key={h} value={h}>{h}</option>
+                  ))}
+                </select>
+                <span className="flex items-center font-pixel text-stone-900 dark:text-[#fdfbf7]">:</span>
+                <select
+                  value={endMinute}
+                  onChange={(e) => setEndMinute(e.target.value)}
+                  disabled={!endHour}
+                  className="w-full border-2 border-stone-400 bg-[#fdfbf7] px-2.5 py-2.5 font-mono text-sm text-stone-900 outline-none focus:border-stone-800 disabled:opacity-40 dark:border-stone-600 dark:bg-[#1e1815] dark:text-[#fdfbf7]"
                 >
                   {Array.from({ length: 12 }, (_, i) => (i * 5).toString().padStart(2, '0')).map(m => (
                     <option key={m} value={m}>{m}</option>
                   ))}
                 </select>
               </div>
+              {endHour && (
+                <button
+                  type="button"
+                  onClick={() => { setEndHour(""); setEndMinute("00"); }}
+                  className="mt-1 font-mono text-[9px] text-stone-400 hover:text-red-500 underline"
+                >
+                  ✕ clear end time
+                </button>
+              )}
             </div>
           </div>
 

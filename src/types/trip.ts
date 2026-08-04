@@ -113,7 +113,10 @@ export interface CandidateLocation {
 
 export interface ActivityItem {
   id: string;
+  /** Start time in HH:MM format */
   time: string;
+  /** Optional end time in HH:MM format — if present renders as "HH:MM - HH:MM" */
+  endTime?: string;
   title: string;
   description?: string;
   /** @deprecated use locations[] instead — kept for backward compat */

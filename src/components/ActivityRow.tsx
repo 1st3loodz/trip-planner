@@ -58,7 +58,9 @@ export default function ActivityRow({ activity, destination, isLast, onEdit, onD
         <div className="mb-1.5 flex flex-wrap items-center gap-2">
           {/* Time — earthy monospace */}
           <span className="font-mono text-xs font-semibold tabular-nums text-stone-800 dark:text-[#fdfbf7]">
-            {activity.time}
+            {activity.endTime
+              ? `${activity.time} – ${activity.endTime}`
+              : activity.time}
           </span>
           {/* Category badge — muted pastel flat pill */}
           <span
