@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ActivityItem, ActivityCategory, DayPlan } from "@/types/trip";
+import { ActivityItem, ActivityCategory, DayPlan, CandidateLocation } from "@/types/trip";
 import { ACTIVITY_CATEGORY_META, generateId } from "@/lib/utils";
 
 interface AddActivityModalProps {
@@ -52,7 +52,17 @@ export default function AddActivityModal({ days, startDate, endDate, initialActi
   const [minute,       setMinute]       = useState(initialActivity?.time?.split(':')[1] ?? "00");
   const [title,        setTitle]        = useState(initialActivity?.title ?? "");
   const [description,  setDescription]  = useState(initialActivity?.description ?? "");
-  const [location,     setLocation]     = useState(initialActivity?.location ?? "");
+  // ── Candidate locations array ─────────────────────────────────────────────
+  // Seed from new `locations` field; fall back to legacy `location` string.
+  const [locations, setLocations] = useState<CandidateLocation[]>(() => {
+    if (initialActivity?.locations && initialActivity.locations.length > 0) {
+      return initialActivity.locations;
+    }
+    if (initialActivity?.location) {
+      return [{ name: initialActivity.location, map_url: "" }];
+    }
+    return [];
+  });
   const [transport,    setTransport]    = useState(initialActivity?.transportationNote ?? "");
   const [category,     setCategory]     = useState<ActivityCategory>(initialActivity?.category ?? "sightseeing");
   const [errors,       setErrors]       = useState<Record<string,string>>({});
@@ -90,12 +100,25 @@ export default function AddActivityModal({ days, startDate, endDate, initialActi
       time: `${hour}:${minute}`,
       title: title.trim(),
       description: description.trim() || undefined,
-      location: location.trim() || undefined,
+      locations: locations.filter(l => l.name.trim()),
+      // keep legacy field for any code that still reads it
+      location: locations.find(l => l.name.trim())?.name.trim() || undefined,
       transportationNote: transport.trim() || undefined,
       category,
     });
     setRefreshToggle?.((prev: number) => prev + 1);
     onClose();
+  }
+
+  // ── Location helpers ──────────────────────────────────────────────────────
+  function addLocation() {
+    setLocations(prev => [...prev, { name: "", map_url: "" }]);
+  }
+  function removeLocation(idx: number) {
+    setLocations(prev => prev.filter((_, i) => i !== idx));
+  }
+  function updateLocation(idx: number, field: keyof CandidateLocation, value: string) {
+    setLocations(prev => prev.map((loc, i) => i === idx ? { ...loc, [field]: value } : loc));
   }
 
   const selectedDay = days.find((d) => d.dayNumber === dayNumber);
@@ -221,9 +244,56 @@ export default function AddActivityModal({ days, startDate, endDate, initialActi
               className="w-full resize-none border-2 border-stone-400 bg-[#fdfbf7] px-3.5 py-2.5 font-mono text-sm text-stone-900 placeholder-stone-400 outline-none focus:border-stone-800 dark:border-stone-600 dark:bg-[#1e1815] dark:text-[#fdfbf7] dark:placeholder-stone-500" />
           </div>
 
+          {/* ── Candidate Locations ─────────────────────────────────────────── */}
           <div>
-            <label className="mb-1.5 block font-pixel text-[8px] uppercase tracking-widest text-stone-600 dark:text-stone-400">📍 Location</label>
-            <input type="text" placeholder="e.g. 4 Jingshan Front St, Dongcheng" value={location} onChange={(e) => setLocation(e.target.value)} className={inputCls()} />
+            <label className="mb-2 block font-pixel text-[8px] uppercase tracking-widest text-stone-600 dark:text-stone-400">📍 Candidate Locations</label>
+
+            {locations.length === 0 && (
+              <p className="mb-2 font-mono text-[10px] text-stone-400 dark:text-stone-500 italic">No locations added yet.</p>
+            )}
+
+            <div className="space-y-2">
+              {locations.map((loc, idx) => (
+                <div key={idx} className="flex gap-2 items-start border-2 border-stone-300 dark:border-stone-600 bg-[#fdfbf7] dark:bg-[#1e1815] px-2.5 py-2">
+                  <div className="flex-1 space-y-1.5 min-w-0">
+                    {/* Location Name */}
+                    <input
+                      type="text"
+                      placeholder={`Location ${idx + 1} name (e.g. Forbidden City)`}
+                      value={loc.name}
+                      onChange={(e) => updateLocation(idx, "name", e.target.value)}
+                      className={inputCls()}
+                    />
+                    {/* Google Maps URL */}
+                    <input
+                      type="url"
+                      placeholder="Google Maps URL (optional)"
+                      value={loc.map_url ?? ""}
+                      onChange={(e) => updateLocation(idx, "map_url", e.target.value)}
+                      className="w-full border-2 border-stone-300 bg-[#f5f5f0] px-3 py-1.5 font-mono text-[11px] text-stone-700 placeholder-stone-400 outline-none focus:border-stone-600 dark:border-stone-700 dark:bg-[#28211d] dark:text-[#f5ebd5] dark:placeholder-stone-600"
+                    />
+                  </div>
+                  {/* Delete Row */}
+                  <button
+                    type="button"
+                    onClick={() => removeLocation(idx)}
+                    title="Remove location"
+                    className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center border-2 border-red-300 bg-red-50 text-red-600 hover:bg-red-100 dark:border-red-800 dark:bg-red-900/30 dark:text-red-400 dark:hover:bg-red-900/50 transition-colors"
+                  >
+                    🗑
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            {/* Add Candidate Location button */}
+            <button
+              type="button"
+              onClick={addLocation}
+              className="mt-2 flex w-full items-center justify-center gap-2 border-2 border-dashed border-stone-400 bg-[#fdfbf7] py-2 font-mono text-[11px] text-stone-600 hover:border-stone-600 hover:bg-[#f0e8d4] dark:border-stone-600 dark:bg-[#28211d] dark:text-stone-400 dark:hover:border-[#54463d] transition-colors"
+            >
+              <span>＋</span> Add Candidate Location
+            </button>
           </div>
 
           <div>

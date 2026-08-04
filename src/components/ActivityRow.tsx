@@ -78,34 +78,61 @@ export default function ActivityRow({ activity, destination, isLast, onEdit, onD
         {activity.description && (
           <p className="mb-1.5 whitespace-pre-line font-mono text-xs leading-relaxed text-stone-600 dark:text-[#f5ebd5]">{activity.description}</p>
         )}
-        {activity.location && (
-          <div className="mb-1.5">
-            <div className="flex items-start gap-1.5">
-              <span className="mt-px text-[10px]">📍</span>
-              <span className="font-mono text-[10px] leading-tight text-stone-600 dark:text-[#f5ebd5]">{activity.location}</span>
+        {/* ── Candidate Locations list ─────────────────────────────────── */}
+        {(() => {
+          // Prefer new locations[] array; fall back to legacy location string
+          const locList = (activity.locations && activity.locations.length > 0)
+            ? activity.locations
+            : activity.location
+              ? [{ name: activity.location, map_url: undefined }]
+              : [];
+
+          if (locList.length === 0) return null;
+
+          return (
+            <div className="mb-1.5 space-y-1.5">
+              {locList.map((loc, idx) => {
+                // Determine Google Maps href: prefer explicit map_url, else search query
+                const hasCustomUrl = loc.map_url && loc.map_url.trim().startsWith("http");
+                const googleUrl = hasCustomUrl
+                  ? loc.map_url!
+                  : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(loc.name)}`;
+                const amapUrl = `https://uri.amap.com/search?keyword=${encodeURIComponent(loc.name)}`;
+
+                return (
+                  <div key={idx} className="flex items-start gap-1.5">
+                    <span className="mt-px text-[10px] shrink-0">📍</span>
+                    <div className="min-w-0">
+                      <span className="font-mono text-[10px] leading-tight text-stone-600 dark:text-[#f5ebd5] break-words">
+                        {loc.name}
+                      </span>
+                      <div className="mt-1 flex flex-wrap gap-1.5">
+                        <a
+                          href={googleUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="game-btn flex items-center gap-1 border-2 border-stone-800 bg-[#fdfbf7] px-2 py-1 font-pixel text-[7px] uppercase tracking-wider text-stone-800 hover:bg-[#e8dcc4] dark:border-[#54463d] dark:bg-[#1e1815] dark:text-[#fdfbf7] dark:hover:bg-[#362d28]"
+                        >
+                          🗺 Google Maps
+                        </a>
+                        {showAmap && (
+                          <a
+                            href={amapUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="game-btn flex items-center gap-1 border-2 border-stone-800 bg-[#fdfbf7] px-2 py-1 font-pixel text-[7px] uppercase tracking-wider text-stone-800 hover:bg-[#e8dcc4] dark:border-[#54463d] dark:bg-[#1e1815] dark:text-[#fdfbf7] dark:hover:bg-[#362d28]"
+                          >
+                            📍 Amap
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-            
-            {/* Inline Map Action Links */}
-            <div className="mt-1.5 flex flex-wrap gap-2 ml-[18px]">
-              <a 
-                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(activity.location)}`}
-                target="_blank" rel="noopener noreferrer"
-                className="game-btn flex items-center gap-1 border-2 border-stone-800 bg-[#fdfbf7] px-2 py-1 font-pixel text-[7px] uppercase tracking-wider text-stone-800 hover:bg-[#e8dcc4] dark:border-[#54463d] dark:bg-[#1e1815] dark:text-[#fdfbf7] dark:hover:bg-[#362d28]"
-              >
-                🗺 Google Maps
-              </a>
-              {showAmap && (
-                <a 
-                  href={`https://uri.amap.com/search?keyword=${encodeURIComponent(activity.location)}`}
-                  target="_blank" rel="noopener noreferrer"
-                  className="game-btn flex items-center gap-1 border-2 border-stone-800 bg-[#fdfbf7] px-2 py-1 font-pixel text-[7px] uppercase tracking-wider text-stone-800 hover:bg-[#e8dcc4] dark:border-[#54463d] dark:bg-[#1e1815] dark:text-[#fdfbf7] dark:hover:bg-[#362d28]"
-                >
-                  📍 Amap
-                </a>
-              )}
-            </div>
-          </div>
-        )}
+          );
+        })()}
         {activity.transportationNote && (
           <div
             className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 font-mono text-[10px]"

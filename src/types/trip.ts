@@ -106,12 +106,19 @@ export type ActivityCategory =
   | "shopping"
   | string;
 
+export interface CandidateLocation {
+  name: string;
+  map_url?: string;
+}
+
 export interface ActivityItem {
   id: string;
   time: string;
   title: string;
   description?: string;
+  /** @deprecated use locations[] instead — kept for backward compat */
   location?: string;
+  locations?: CandidateLocation[];
   transportationNote?: string;
   category: ActivityCategory;
 }
