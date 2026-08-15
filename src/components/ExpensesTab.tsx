@@ -58,10 +58,10 @@ export default function ExpensesTab({
     setActiveSection("ledger");
   }
 
-  // Settlements computed in base currency
+  // Settlements computed in base currency — participants passed for fallback split logic
   const settlements = useMemo(
-    () => computeSettlementsInBase(expenses, rates, baseCurrency),
-    [expenses, rates, baseCurrency]
+    () => computeSettlementsInBase(expenses, rates, baseCurrency, participants),
+    [expenses, rates, baseCurrency, participants]
   );
 
   // Per-currency raw totals and their frozen base equivalents
@@ -294,50 +294,6 @@ export default function ExpensesTab({
           <p className="mb-4 font-mono text-[9px] text-stone-500 dark:text-stone-400">
             Using your exchange rates: 1 CNY = {rates.CNY} {baseCurrency} · 1 JPY = {rates.JPY} {baseCurrency} · 1 USD = {rates.USD} {baseCurrency}
           </p>
-          {/* Coverage summary — shows which expenses feed into settlements */}
-          {(() => {
-            const total    = expenses.length;
-            const excluded = expenses.filter(e => e.isExcluded).length;
-            const noSplits = expenses.filter(e => !e.isExcluded && (!e.splits || e.splits.length === 0)).length;
-            const selfOnly = expenses.filter(e => {
-              if (e.isExcluded || !e.splits || e.splits.length === 0) return false;
-              return e.splits.every(s => s.participantId === e.paidById);
-            }).length;
-            const counted  = total - excluded - noSplits - selfOnly;
-            const skipped  = excluded + noSplits + selfOnly;
-            return (
-              <div className="mb-4 border-2 border-stone-400 bg-[#fdfbf7] px-4 py-3 dark:border-[#54463d] dark:bg-[#1e1815]">
-                <p className="font-pixel text-[8px] uppercase tracking-widest text-stone-600 dark:text-stone-400 mb-2">
-                  📊 Expense Coverage
-                </p>
-                <div className="flex flex-wrap gap-x-6 gap-y-1 font-mono text-[11px]">
-                  <span className="text-stone-700 dark:text-[#fdfbf7]">
-                    ✅ <strong>{counted}</strong> / {total} included in settlement
-                  </span>
-                  {excluded > 0 && (
-                    <span className="text-amber-700 dark:text-amber-400">
-                      🛡️ {excluded} personal/excluded (correct — skipped)
-                    </span>
-                  )}
-                  {noSplits > 0 && (
-                    <span className="text-red-700 dark:text-red-400">
-                      ⚠️ {noSplits} with no splits (check AddExpense modal)
-                    </span>
-                  )}
-                  {selfOnly > 0 && (
-                    <span className="text-stone-500 dark:text-stone-400">
-                      ℹ️ {selfOnly} payer-only (no inter-person debt)
-                    </span>
-                  )}
-                </div>
-                {skipped > excluded && (
-                  <p className="mt-2 font-mono text-[10px] text-red-600 dark:text-red-400">
-                    ⚠️ {noSplits + selfOnly} expense(s) are missing splits — open each expense and verify participants are assigned.
-                  </p>
-                )}
-              </div>
-            );
-          })()}
           <SettlementCalculator
             settlements={settlements}
             participants={participants}
