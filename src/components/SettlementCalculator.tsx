@@ -50,15 +50,37 @@ export default function SettlementCalculator({ settlements, participants, onEdit
   }, [settlements]);
 
   async function toggleSubExpenseSettled(s: Settlement, inv: NonNullable<Settlement["involvedExpenses"]>[0]) {
-    if (!inv?.expense) return; // guard: nothing to toggle if expense is missing
+    if (!inv?.expense?.id) return;
     const debtorId = inv.isCredit ? s.toId : s.fromId;
     const itemId = `${inv.expense.id}-${debtorId}`;
     
     // Determine the action based on the *specific* sub-item's current state
     const isCurrentlySettled = stagedSettlements.includes(itemId);
     
-    // Defer to the master toggle to apply the action group-wide
-    await handleMasterToggle(s, isCurrentlySettled);
+    // 1. Instant local visual update
+    if (isCurrentlySettled) {
+      setStagedSettlements(prev => prev.filter(id => id !== itemId));
+    } else {
+      setStagedSettlements(prev => [...prev, itemId]);
+    }
+    
+    // 2. Database update
+    let expToUpdate = { ...inv.expense };
+    const split = expToUpdate.splits?.find(sp => sp.participantId === debtorId);
+    
+    if (isCurrentlySettled && split?.isSettled) {
+      expToUpdate = {
+        ...expToUpdate,
+        splits: (expToUpdate.splits ?? []).map(sp => sp.participantId === debtorId ? { ...sp, isSettled: false } : sp)
+      };
+    } else if (!isCurrentlySettled && !split?.isSettled) {
+      expToUpdate = {
+        ...expToUpdate,
+        splits: (expToUpdate.splits ?? []).map(sp => sp.participantId === debtorId ? { ...sp, isSettled: true } : sp)
+      };
+    }
+    
+    onEditExpense(expToUpdate);
   }
 
   async function handleMasterToggle(s: Settlement, isMasterChecked: boolean) {
