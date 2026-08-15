@@ -37,7 +37,7 @@ export default function IndividualSummary({ expenses, participants, customCatego
     const map = new Map<string, LedgerEntry[]>();
     for (const exp of expenses) {
       const expAmt = parseFloat(exp.amount as any) || 0;
-      const actualPaidById = exp.paidById || (exp as any).paid_by || (exp as any).payer_id;
+      const actualPaidById = exp.paidById || (exp as any).paid_by || (exp as any).payer_id || (exp as any).created_by || (exp as any).createdBy;
       if (exp.isExcluded) {
         const split = exp.splits.find((s) => s.participantId === selectedId);
         if (actualPaidById === selectedId || split) {
@@ -246,7 +246,7 @@ export default function IndividualSummary({ expenses, participants, customCatego
                     const customCat = customCategories.find(c => c.id === expense.category);
                     const cat      = EXPENSE_CATEGORY_META[expense.category] || { label: customCat?.label || expense.category, emoji: customCat?.emoji || "✨", color: "bg-stone-500/15 text-stone-800" };
                     const cur      = CURRENCY_META[expense.currency];
-                    const actualPaidById = expense.paidById || (expense as any).paid_by || (expense as any).payer_id;
+                    const actualPaidById = expense.paidById || (expense as any).paid_by || (expense as any).payer_id || (expense as any).created_by || (expense as any).createdBy;
                     const isPayer  = actualPaidById === selectedId;
                     const baseAmt  = convertToBase(share, expense.currency, rates);
                     return (

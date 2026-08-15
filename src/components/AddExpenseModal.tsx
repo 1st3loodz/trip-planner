@@ -24,7 +24,7 @@ export default function AddExpenseModal({ participants, initialExpense, onSave, 
   const [amount,      setAmount]      = useState(initialExpense?.amount.toString() ?? "");
   const [currency,    setCurrency]    = useState<Currency>(initialExpense?.currency ?? "CNY");
   const [category,    setCategory]    = useState<ExpenseCategory>(initialExpense?.category ?? "food");
-  const actualInitialPayer = initialExpense ? (initialExpense.paidById || (initialExpense as any).paid_by || (initialExpense as any).payer_id) : undefined;
+  const actualInitialPayer = initialExpense ? (initialExpense.paidById || (initialExpense as any).paid_by || (initialExpense as any).payer_id || (initialExpense as any).created_by || (initialExpense as any).createdBy) : undefined;
   const [paidById,    setPaidById]    = useState(actualInitialPayer ?? participants[0]?.id ?? "");
   const [date,        setDate]        = useState(initialExpense?.date ?? new Date().toISOString().slice(0, 10));
   const [splitIds,    setSplitIds]    = useState<Set<string>>(
@@ -111,11 +111,12 @@ export default function AddExpenseModal({ participants, initialExpense, onSave, 
     onSave({
       id: initialExpense?.id ?? `e-${generateId()}`,
       description: description.trim(), amount: num, currency, category, paidById, date, isExcluded,
+      paid_by: paidById, // explicitly save as snake_case for backend compatibility
       splits: splitArray.map((id) => ({ participantId: id, amount: parseFloat(perPerson.toFixed(2)) })),
       createdAt: initialExpense?.createdAt ?? new Date().toISOString(),
       historicalRate: hRate,
       historicalBaseAmount: hBaseAmount,
-    });
+    } as Expense & { paid_by: string });
     
     setIsSubmitting(false);
     onClose();

@@ -87,7 +87,9 @@ export function computeSettlementsInBase(
 
     // ── 3. Resolve payer — check multiple keys for accurate payer identity ──
     const actualPaidById = exp.paidById || (exp as any).paid_by || (exp as any).payer_id;
-    const paidBy = actualPaidById && actualPaidById.trim() ? actualPaidById : undefined;
+    const paidBy = actualPaidById && actualPaidById.trim() 
+      ? actualPaidById 
+      : ((exp as any).created_by || (exp as any).createdBy);
 
     // Can't do anything without a valid payer identity
     if (!paidBy) continue;
