@@ -1,5 +1,5 @@
 import { Expense, Settlement, Currency, Participant } from "@/types/trip";
-import { Rates, convertToBase } from "@/lib/currency";
+import { Rates, convertToBase, getExpenseEffectiveRate } from "@/lib/currency";
 
 /**
  * Original multi-currency settlement (no conversion).
@@ -126,9 +126,7 @@ export function computeSettlementsInBase(
       // For legacy foreign expenses, split.amount is in foreign currency and needs conversion.
       const shareBase = (exp.foreignAmount !== undefined) 
         ? splitAmt 
-        : (exp.historicalRate
-          ? splitAmt * exp.historicalRate
-          : convertToBase(splitAmt, exp.currency, rates));
+        : splitAmt * getExpenseEffectiveRate(exp);
 
       if (shareBase <= 0) continue;
 

@@ -6,7 +6,8 @@ import {
   EXPENSE_CATEGORY_META, CURRENCY_META,
 } from "@/types/trip";
 import { formatCurrency } from "@/lib/utils";
-import { convertToBase, formatBase } from "@/lib/currency";
+import { convertToBase, formatBase, getExpenseEffectiveRate } from "@/lib/currency";
+import { ExpensePieChart } from "./ExpensePieChart";
 import { useCurrency } from "@/contexts/CurrencyContext";
 import { computeSettlementsInBase } from "@/lib/settlement";
 import ExpenseCard          from "@/components/ExpenseCard";
@@ -67,10 +68,14 @@ export default function ExpensesTab({
   // Per-currency raw totals and their frozen base equivalents
   const rawTotals = expenses.reduce<Record<string, { total: number; baseTotal: number }>>((acc, e) => {
     if (!e.isExcluded) {
-      const amt = parseFloat(e.amount as any) || 0;
+      const effectiveRate = getExpenseEffectiveRate(e);
+      const totalBillTHB = (e.currency !== baseCurrency && Number(e.foreignAmount) > 0)
+        ? Number(e.foreignAmount) * effectiveRate
+        : Number(e.amount) || 0;
+        
       if (!acc[e.currency]) acc[e.currency] = { total: 0, baseTotal: 0 };
-      acc[e.currency].total += amt;
-      acc[e.currency].baseTotal += (e.historicalBaseAmount ?? convertToBase(amt, e.currency, rates));
+      acc[e.currency].total += (e.currency !== baseCurrency && Number(e.foreignAmount) > 0) ? Number(e.foreignAmount) : (parseFloat(e.amount as any) || 0);
+      acc[e.currency].baseTotal += totalBillTHB;
     }
     return acc;
   }, {});
@@ -78,10 +83,14 @@ export default function ExpensesTab({
   // Grand total in base currency
   const grandTotalBase = useMemo(
     () => expenses.reduce((sum, e) => {
-      const amt = parseFloat(e.amount as any) || 0;
-      return sum + (e.isExcluded ? 0 : (e.historicalBaseAmount ?? convertToBase(amt, e.currency, rates)));
+      if (e.isExcluded) return sum;
+      const effectiveRate = getExpenseEffectiveRate(e);
+      const totalBillTHB = (e.currency !== baseCurrency && Number(e.foreignAmount) > 0)
+        ? Number(e.foreignAmount) * effectiveRate
+        : Number(e.amount) || 0;
+      return sum + totalBillTHB;
     }, 0),
-    [expenses, rates]
+    [expenses, baseCurrency]
   );
 
   const filtered = expenses
@@ -230,8 +239,12 @@ export default function ExpensesTab({
             <div className="space-y-4">
               {groupedExpenses.map((group) => {
                 const dayTotal = group.expenses.reduce((sum, e) => {
-                  const amt = parseFloat(e.amount as any) || 0;
-                  return sum + (e.isExcluded ? 0 : (e.historicalBaseAmount ?? convertToBase(amt, e.currency, rates)));
+                  if (e.isExcluded) return sum;
+                  const effectiveRate = getExpenseEffectiveRate(e);
+                  const totalBillTHB = (e.currency !== baseCurrency && Number(e.foreignAmount) > 0)
+                    ? Number(e.foreignAmount) * effectiveRate
+                    : Number(e.amount) || 0;
+                  return sum + totalBillTHB;
                 }, 0);
                 const isExpanded = expandedDates[group.date] ?? false;
 

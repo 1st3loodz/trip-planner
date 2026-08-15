@@ -6,6 +6,7 @@ import {
   EXPENSE_CATEGORY_META, CURRENCY_META, Currency,
 } from "@/types/trip";
 import { useCurrency } from "@/contexts/CurrencyContext";
+import { getExpenseEffectiveRate } from "@/lib/currency";
 import { convertToBase, formatBase } from "@/lib/currency";
 import { formatCurrency } from "@/lib/utils";
 import Avatar from "@/components/Avatar";
@@ -36,10 +37,7 @@ export default function IndividualSummary({ expenses, participants, customCatego
   const allGroups = useMemo<DayGroup[]>(() => {
     const map = new Map<string, LedgerEntry[]>();
     for (const exp of expenses) {
-      let effectiveRate = Number((exp as any).custom_exchange_rate) || Number(exp.exchangeRate) || Number((exp as any).exchange_rate) || Number(exp.historicalRate) || 0;
-      if (effectiveRate <= 0 || effectiveRate === 1) {
-        effectiveRate = (exp.currency !== baseCurrency) ? (rates[exp.currency] || DEFAULT_RATES[baseCurrency]?.[exp.currency] || 1) : 1;
-      }
+      const effectiveRate = getExpenseEffectiveRate(exp);
       const isLegacy = exp.foreignAmount === undefined && exp.currency !== baseCurrency;
       
       const totalBillTHB = (exp.currency !== baseCurrency && Number(exp.foreignAmount) > 0)
@@ -278,10 +276,7 @@ export default function IndividualSummary({ expenses, participants, customCatego
                     const actualPaidById = expense.paidById || (expense as any).paid_by || (expense as any).payer_id || (expense as any).created_by || (expense as any).createdBy;
                     const isPayer  = actualPaidById === selectedId;
                     
-                    let effectiveRate = Number((expense as any).custom_exchange_rate) || Number(expense.exchangeRate) || Number((expense as any).exchange_rate) || Number(expense.historicalRate) || 0;
-                    if (effectiveRate <= 0 || effectiveRate === 1) {
-                      effectiveRate = (expense.currency !== baseCurrency) ? (rates[expense.currency] || DEFAULT_RATES[baseCurrency]?.[expense.currency] || 1) : 1;
-                    }
+                    const effectiveRate = getExpenseEffectiveRate(expense);
                     const totalBillTHB = (expense.currency !== baseCurrency && Number(expense.foreignAmount) > 0)
                       ? Number(expense.foreignAmount) * effectiveRate
                       : Number(expense.amount) || 0;

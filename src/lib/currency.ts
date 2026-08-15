@@ -36,3 +36,23 @@ export function formatBase(amount: number, baseCurrency: Currency): string {
   const rounded = isJPY ? Math.round(amount) : parseFloat(amount.toFixed(2));
   return `${symbol}${rounded.toLocaleString()}`;
 }
+
+/** Resolves the exact effective exchange rate for an expense. */
+export const getExpenseEffectiveRate = (expense: any): number => {
+  // 1. Custom rate entered by user takes highest priority
+  const customRate = Number(expense?.custom_exchange_rate) || Number(expense?.customExchangeRate);
+  if (customRate > 0) return customRate;
+
+  // 2. Exact exchange rate stored on the expense (e.g. 0.209096 from API/DB)
+  const recordedRate = Number(expense?.exchange_rate) || Number(expense?.exchangeRate) || Number(expense?.historicalRate);
+  if (recordedRate > 0) return recordedRate;
+
+  // 3. If THB, rate is 1. If foreign currency with missing rate, calculate from amount/foreign_amount if available
+  if (expense?.currency === 'THB') return 1;
+  if (Number(expense?.amount) > 0 && (Number(expense?.foreign_amount) > 0 || Number(expense?.foreignAmount) > 0)) {
+    const foreign = Number(expense?.foreign_amount) || Number(expense?.foreignAmount);
+    return Number(expense.amount) / foreign;
+  }
+
+  return 1;
+};
