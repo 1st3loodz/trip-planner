@@ -217,8 +217,13 @@ export default function ExpensesTab({
             </div>
           </div>
 
-          <div className="mb-3 font-mono text-[10px] text-stone-500 dark:text-stone-400">
-            {filtered.length} expense{filtered.length !== 1 ? "s" : ""} shown
+          <div className="mb-3 flex items-center justify-between font-mono text-[10px] text-stone-500 dark:text-stone-400">
+            <span>{filtered.length} expense{filtered.length !== 1 ? "s" : ""} shown</span>
+            <div className="flex gap-2">
+              <button onClick={() => setExpandedDates(groupedExpenses.reduce((acc, g) => ({ ...acc, [g.date]: true }), {}))} className="underline hover:text-stone-800 dark:hover:text-[#fdfbf7]">Expand All</button>
+              <span>·</span>
+              <button onClick={() => setExpandedDates({})} className="underline hover:text-stone-800 dark:hover:text-[#fdfbf7]">Collapse All</button>
+            </div>
           </div>
 
           {groupedExpenses.length > 0 ? (
@@ -228,7 +233,7 @@ export default function ExpensesTab({
                   const amt = parseFloat(e.amount as any) || 0;
                   return sum + (e.isExcluded ? 0 : (e.historicalBaseAmount ?? convertToBase(amt, e.currency, rates)));
                 }, 0);
-                const isExpanded = expandedDates[group.date] ?? true;
+                const isExpanded = expandedDates[group.date] ?? false;
 
                 return (
                   <div key={group.date} className="border-4 border-stone-800 bg-[#fdfbf7] dark:border-[#54463d] dark:bg-[#28211d] shadow-[4px_4px_0_#292524] dark:shadow-[4px_4px_0_#1e1815] transition-all">
@@ -252,15 +257,20 @@ export default function ExpensesTab({
                       </div>
                     </button>
                     
-                    {isExpanded && (
-                      <div className="p-3 space-y-3 bg-[#fdfbf7] dark:bg-[#28211d]">
-                        {group.expenses.map((exp) => (
-                          <ExpenseCard key={exp.id} expense={exp} participants={participants} customCategories={customCategories}
-                            onEdit={(e) => setModalState({ mode: "edit", expense: e })}
-                            onDelete={(id) => setExpenseToDelete(id)} />
-                        ))}
+                    <div 
+                      className="grid transition-[grid-template-rows] duration-300 ease-in-out" 
+                      style={{ gridTemplateRows: isExpanded ? "1fr" : "0fr" }}
+                    >
+                      <div className="overflow-hidden">
+                        <div className="p-3 space-y-3 bg-[#fdfbf7] dark:bg-[#28211d]">
+                          {group.expenses.map((exp) => (
+                            <ExpenseCard key={exp.id} expense={exp} participants={participants} customCategories={customCategories}
+                              onEdit={(e) => setModalState({ mode: "edit", expense: e })}
+                              onDelete={(id) => setExpenseToDelete(id)} />
+                          ))}
+                        </div>
                       </div>
-                    )}
+                    </div>
                   </div>
                 );
               })}
