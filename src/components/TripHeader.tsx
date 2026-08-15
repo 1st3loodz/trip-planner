@@ -5,6 +5,8 @@ import Avatar from "@/components/Avatar";
 import { useTrips } from "@/contexts/TripContext";
 import EditTripModal from "@/components/EditTripModal";
 import { createClient } from "@/utils/supabase/client";
+import { useCurrency } from "@/contexts/CurrencyContext";
+import { exportTripToExcel } from "@/lib/exportExcel";
 
 interface TripHeaderProps {
   trip: Trip;
@@ -20,7 +22,9 @@ export default function TripHeader({ trip, activeTab, onTabChange, onManageMembe
   const [noticeText,      setNoticeText]       = useState(trip.notice ?? "");
   const [isSavingNotice,  setIsSavingNotice]   = useState(false);
   const [linkCopied,     setLinkCopied]      = useState(false);
+  const [isExporting,    setIsExporting]     = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const { baseCurrency, rates } = useCurrency();
 
   const handleCopyInviteLink = () => {
     const url = `https://trip-planner-six-kappa.vercel.app/trip/${trip.id}/invite`;
@@ -185,6 +189,23 @@ export default function TripHeader({ trip, activeTab, onTabChange, onManageMembe
                 }`}
               >
                 {linkCopied ? "✔ Copied!" : "🔗 Invite Link"}
+              </button>
+              <button
+                onClick={async () => {
+                  setIsExporting(true);
+                  try {
+                    await exportTripToExcel(trip, baseCurrency, rates);
+                  } catch (err) {
+                    console.error("Failed to export trip to excel", err);
+                    alert("Failed to export to excel");
+                  } finally {
+                    setIsExporting(false);
+                  }
+                }}
+                disabled={isExporting}
+                className="game-btn flex items-center gap-1.5 px-3 py-1.5 font-pixel text-[7px] uppercase bg-blue-600 text-[#fdfbf7] dark:bg-blue-700 hover:bg-blue-700 dark:hover:bg-blue-800 disabled:opacity-50"
+              >
+                {isExporting ? "⏳ Exporting..." : "📊 Export"}
               </button>
               <button
                 onClick={onManageMembers}
