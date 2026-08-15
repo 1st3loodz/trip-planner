@@ -167,19 +167,27 @@ export default function ItineraryTab({ trip, onAddActivity, onEditActivity, onDe
       {visibleDays.length > 0 ? (
         isFiltering ? (
           // Plain list when a category filter is active (no DnD while filtering)
-          visibleDays.map((day) => (
-            <ErrorBoundary key={day.id || day.dayNumber}>
-              <DayCard
-                day={day}
-                destination={trip.destination}
-                tripStartDate={trip.startDate}
-                defaultOpen={false}
-                customCategories={customCategories}
-                onEditActivity={(dayNumber, activity) => setModalState({ mode: "edit", activity, dayNumber })}
-                onDeleteActivity={onDeleteActivity}
-              />
-            </ErrorBoundary>
-          ))
+          visibleDays.map((day, idx) => {
+            try {
+              if (!day) return null;
+              return (
+                <ErrorBoundary key={day?.id || day?.dayNumber || idx}>
+                  <DayCard
+                    day={day}
+                    destination={trip.destination}
+                    tripStartDate={trip.startDate}
+                    defaultOpen={false}
+                    customCategories={customCategories}
+                    onEditActivity={(dayNumber, activity) => setModalState({ mode: "edit", activity, dayNumber })}
+                    onDeleteActivity={onDeleteActivity}
+                  />
+                </ErrorBoundary>
+              );
+            } catch (err) {
+              console.error('Failed to render day card:', day, err);
+              return null;
+            }
+          })
         ) : (
           <DragDropContext onDragEnd={handleDragEnd}>
             <Droppable droppableId="days-list" type="day">
@@ -188,40 +196,48 @@ export default function ItineraryTab({ trip, onAddActivity, onEditActivity, onDe
                   ref={provided.innerRef}
                   {...provided.droppableProps}
                 >
-                  {visibleDays.map((day, index) => (
-                    <ErrorBoundary key={day.id || day.dayNumber}>
-                      <Draggable draggableId={String(day.dayNumber)} index={index} isDragDisabled={isFiltering}>
-                        {(dragProvided, dragSnapshot) => (
-                          <div
-                            ref={dragProvided.innerRef}
-                            {...dragProvided.draggableProps}
-                            style={{
-                              ...dragProvided.draggableProps.style,
-                              opacity: dragSnapshot.isDragging ? 0.85 : 1,
-                              transform: dragSnapshot.isDragging
-                                ? `${dragProvided.draggableProps.style?.transform ?? ""} rotate(1.5deg)`
-                                : dragProvided.draggableProps.style?.transform,
-                              boxShadow: dragSnapshot.isDragging
-                                ? "6px 6px 0 #292524"
-                                : undefined,
-                              zIndex: dragSnapshot.isDragging ? 50 : undefined,
-                            }}
-                          >
-                            <DayCard
-                              day={day}
-                              destination={trip.destination}
-                              tripStartDate={trip.startDate}
-                              defaultOpen={false}
-                              customCategories={customCategories}
-                              dragHandleProps={isFiltering ? null : dragProvided.dragHandleProps}
-                              onEditActivity={(dayNumber, activity) => setModalState({ mode: "edit", activity, dayNumber })}
-                              onDeleteActivity={onDeleteActivity}
-                            />
-                          </div>
-                        )}
-                      </Draggable>
-                    </ErrorBoundary>
-                  ))}
+                  {visibleDays.map((day, index) => {
+                    try {
+                      if (!day) return null;
+                      return (
+                        <ErrorBoundary key={day?.id || day?.dayNumber || index}>
+                          <Draggable draggableId={String(day?.dayNumber || index)} index={index} isDragDisabled={isFiltering}>
+                            {(dragProvided, dragSnapshot) => (
+                              <div
+                                ref={dragProvided.innerRef}
+                                {...dragProvided.draggableProps}
+                                style={{
+                                  ...dragProvided.draggableProps.style,
+                                  opacity: dragSnapshot.isDragging ? 0.85 : 1,
+                                  transform: dragSnapshot.isDragging
+                                    ? `${dragProvided.draggableProps.style?.transform ?? ""} rotate(1.5deg)`
+                                    : dragProvided.draggableProps.style?.transform,
+                                  boxShadow: dragSnapshot.isDragging
+                                    ? "6px 6px 0 #292524"
+                                    : undefined,
+                                  zIndex: dragSnapshot.isDragging ? 50 : undefined,
+                                }}
+                              >
+                                <DayCard
+                                  day={day}
+                                  destination={trip.destination}
+                                  tripStartDate={trip.startDate}
+                                  defaultOpen={false}
+                                  customCategories={customCategories}
+                                  dragHandleProps={isFiltering ? null : dragProvided.dragHandleProps}
+                                  onEditActivity={(dayNumber, activity) => setModalState({ mode: "edit", activity, dayNumber })}
+                                  onDeleteActivity={onDeleteActivity}
+                                />
+                              </div>
+                            )}
+                          </Draggable>
+                        </ErrorBoundary>
+                      );
+                    } catch (err) {
+                      console.error('Failed to render day card:', day, err);
+                      return null;
+                    }
+                  })}
                   {provided.placeholder}
                 </div>
               )}
