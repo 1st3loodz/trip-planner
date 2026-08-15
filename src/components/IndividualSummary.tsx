@@ -17,7 +17,7 @@ interface IndividualSummaryProps {
   customCategories?: { id: string; label: string; emoji: string }[];
 }
 
-interface LedgerEntry { expense: Expense; share: number; isPersonal?: boolean; }
+interface LedgerEntry { expense: Expense; share: number; shareBase: number; isPersonal?: boolean; }
 interface DayGroup    { date: string; items: LedgerEntry[]; }
 
 const ALL_CATEGORY = "all" as const;
@@ -36,15 +36,22 @@ export default function IndividualSummary({ expenses, participants, customCatego
   const allGroups = useMemo<DayGroup[]>(() => {
     const map = new Map<string, LedgerEntry[]>();
     for (const exp of expenses) {
-      const expAmt = parseFloat(exp.amount as any) || 0;
+      const isLegacy = exp.foreignAmount === undefined && exp.currency !== baseCurrency;
+      const effectiveRate = exp.exchangeRate ?? exp.historicalRate ?? ((exp.foreignAmount && exp.foreignAmount > 0) ? exp.amount / exp.foreignAmount : 1);
+      
       const actualPaidById = exp.paidById || (exp as any).paid_by || (exp as any).payer_id || (exp as any).created_by || (exp as any).createdBy;
+      
+      const getShareBase = (amt: number) => isLegacy ? convertToBase(amt, exp.currency, rates) : amt;
+      const getShareForeign = (amt: number) => isLegacy ? amt : amt / effectiveRate;
+
       if (exp.isExcluded) {
         const split = exp.splits.find((s) => s.participantId === selectedId);
         if (actualPaidById === selectedId || split) {
           const list = map.get(exp.date) ?? [];
-          const splitAmt = split ? parseFloat(split.amount as any) || 0 : 0;
-          const share = actualPaidById === selectedId ? expAmt : splitAmt;
-          list.push({ expense: exp, share, isPersonal: true });
+          const rawAmt = split ? parseFloat(split.amount as any) || 0 : 0;
+          const amt = actualPaidById === selectedId ? (parseFloat(exp.amount as any) || 0) : rawAmt;
+          
+          list.push({ expense: exp, share: getShareForeign(amt), shareBase: getShareBase(amt), isPersonal: true });
           map.set(exp.date, list);
         }
         continue;
@@ -52,14 +59,15 @@ export default function IndividualSummary({ expenses, participants, customCatego
       const split = exp.splits.find((s) => s.participantId === selectedId);
       if (!split) continue;
       const list = map.get(exp.date) ?? [];
-      const splitAmt = parseFloat(split.amount as any) || 0;
-      list.push({ expense: exp, share: splitAmt, isPersonal: false });
+      const amt = parseFloat(split.amount as any) || 0;
+      
+      list.push({ expense: exp, share: getShareForeign(amt), shareBase: getShareBase(amt), isPersonal: false });
       map.set(exp.date, list);
     }
     return Array.from(map.entries())
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([date, items]) => ({ date, items }));
-  }, [expenses, selectedId]);
+  }, [expenses, selectedId, baseCurrency, rates]);
 
   // ── Apply category filter ──────────────────────────────────────────────────
   const groups = useMemo<DayGroup[]>(() => {
@@ -83,14 +91,13 @@ export default function IndividualSummary({ expenses, participants, customCatego
     let shared = 0;
     let personal = 0;
     for (const g of groups) {
-      for (const { expense, share, isPersonal } of g.items) {
-        const baseAmt = convertToBase(share, expense.currency, rates);
-        if (isPersonal) personal += baseAmt;
-        else shared += baseAmt;
+      for (const { shareBase, isPersonal } of g.items) {
+        if (isPersonal) personal += shareBase;
+        else shared += shareBase;
       }
     }
     return { sharedBase: shared, personalBase: personal, combinedBase: shared + personal };
-  }, [groups, rates]);
+  }, [groups]);
 
   function formatDate(isoDate: string) {
     return new Date(isoDate + "T00:00:00").toLocaleDateString("en-US", {
@@ -105,7 +112,7 @@ export default function IndividualSummary({ expenses, participants, customCatego
   }
 
   function getDayTotalBase(items: LedgerEntry[]): number {
-    return items.reduce((s, { expense, share }) => s + convertToBase(share, expense.currency, rates), 0);
+    return items.reduce((s, { shareBase }) => s + shareBase, 0);
   }
 
   const CATEGORIES = Object.keys(EXPENSE_CATEGORY_META) as ExpenseCategory[];
@@ -242,16 +249,17 @@ export default function IndividualSummary({ expenses, participants, customCatego
                   <>
                     {/* Expense rows */}
                 <div className="divide-y-2 divide-stone-200 dark:divide-stone-700">
-                  {items.map(({ expense, share, isPersonal }) => {
+                  {items.map(({ expense, share, shareBase, isPersonal }) => {
                     const customCat = customCategories.find(c => c.id === expense.category);
                     const cat      = EXPENSE_CATEGORY_META[expense.category] || { label: customCat?.label || expense.category, emoji: customCat?.emoji || "✨", color: "bg-stone-500/15 text-stone-800" };
                     const cur      = CURRENCY_META[expense.currency];
                     const actualPaidById = expense.paidById || (expense as any).paid_by || (expense as any).payer_id || (expense as any).created_by || (expense as any).createdBy;
                     const isPayer  = actualPaidById === selectedId;
-                    const baseAmt  = convertToBase(share, expense.currency, rates);
                     
-                    const expBaseAmt = expense.historicalBaseAmount ?? convertToBase(expense.amount, expense.currency, rates);
-                    const owedBase = isPayer ? Math.max(0, expBaseAmt - baseAmt) : 0;
+                    const isLegacy = expense.foreignAmount === undefined && expense.currency !== baseCurrency;
+                    const effectiveRate = expense.exchangeRate ?? expense.historicalRate ?? ((expense.foreignAmount && expense.foreignAmount > 0) ? expense.amount / expense.foreignAmount : 1);
+                    const expBaseAmt = isLegacy ? (expense.historicalBaseAmount ?? convertToBase(expense.amount, expense.currency, rates)) : expense.amount;
+                    const owedBase = isPayer ? Math.max(0, expBaseAmt - shareBase) : 0;
                     
                     return (
                       <div key={expense.id} className="flex items-center gap-3 px-4 py-3">
@@ -262,7 +270,10 @@ export default function IndividualSummary({ expenses, participants, customCatego
                             {expense.description}
                           </p>
                           <p className="font-mono text-[9px] text-stone-500 mt-0.5 tabular-nums">
-                            Total Bill: {formatBase(expBaseAmt, baseCurrency)} (Your share: {formatBase(baseAmt, baseCurrency)})
+                            {expense.currency !== baseCurrency && (
+                              <span className="mr-1">{cur?.flag} {formatCurrency(expense.foreignAmount ?? expense.amount, expense.currency)} (Rate: {effectiveRate}) ➔ </span>
+                            )}
+                            Total: {formatBase(expBaseAmt, baseCurrency)} | Your share: {formatBase(shareBase, baseCurrency)}
                           </p>
                           <div className="flex flex-wrap items-center gap-1.5 mt-1">
                             <span className={`text-[10px] border px-1.5 py-px font-mono font-semibold ${cat.color} text-stone-800`}>
@@ -287,11 +298,11 @@ export default function IndividualSummary({ expenses, participants, customCatego
                             {formatCurrency(share, expense.currency)}
                           </div>
                           <div className="font-pixel text-[8px] uppercase tracking-wider text-stone-500 dark:text-stone-400">
-                            {cur.flag} {expense.currency}
+                            {cur?.flag} {expense.currency}
                           </div>
                           {expense.currency !== baseCurrency && (
                             <div className="font-mono text-[10px] font-semibold text-stone-600 dark:text-stone-400 tabular-nums">
-                              ≈ {formatBase(baseAmt, baseCurrency)}
+                              ≈ {formatBase(shareBase, baseCurrency)}
                             </div>
                           )}
                         </div>
