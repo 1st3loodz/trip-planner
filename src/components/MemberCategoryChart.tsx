@@ -67,8 +67,10 @@ export default function MemberCategoryChart({ memberId, memberName, expenses, cu
   const segments = useMemo(() => {
     let angle = 0;
     const allPresentCats = Array.from(new Set(expenses.filter(e => {
-      if (e.isExcluded) return e.paidById === memberId;
-      return e.splits.some(s => s.participantId === memberId);
+      const actualPaidById = e.paidById || (e as any).paid_by || (e as any).payer_id;
+      if (e.isExcluded) return actualPaidById === memberId;
+      const split = e.splits.find((s) => s.participantId === memberId);
+      return actualPaidById === memberId || !!split;
     }).map(e => e.category)));
     return allPresentCats
       .filter((cat) => (categoryTotals[cat] ?? 0) > 0)

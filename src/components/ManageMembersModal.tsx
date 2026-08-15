@@ -46,7 +46,10 @@ export default function ManageMembersModal({
 
   function getMemberExpenseCount(id: string) {
     return expenses.filter(
-      (e) => e.paidById === id || e.splits.some((s) => s.participantId === id)
+      (e) => {
+        const actualPaidById = e.paidById || (e as any).paid_by || (e as any).payer_id;
+        return actualPaidById === id || e.splits.some((s) => s.participantId === id);
+      }
     ).length;
   }
 

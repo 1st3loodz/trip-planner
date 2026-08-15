@@ -37,12 +37,13 @@ export default function IndividualSummary({ expenses, participants, customCatego
     const map = new Map<string, LedgerEntry[]>();
     for (const exp of expenses) {
       const expAmt = parseFloat(exp.amount as any) || 0;
+      const actualPaidById = exp.paidById || (exp as any).paid_by || (exp as any).payer_id;
       if (exp.isExcluded) {
         const split = exp.splits.find((s) => s.participantId === selectedId);
-        if (exp.paidById === selectedId || split) {
+        if (actualPaidById === selectedId || split) {
           const list = map.get(exp.date) ?? [];
           const splitAmt = split ? parseFloat(split.amount as any) || 0 : 0;
-          const share = exp.paidById === selectedId ? expAmt : splitAmt;
+          const share = actualPaidById === selectedId ? expAmt : splitAmt;
           list.push({ expense: exp, share, isPersonal: true });
           map.set(exp.date, list);
         }
@@ -245,7 +246,8 @@ export default function IndividualSummary({ expenses, participants, customCatego
                     const customCat = customCategories.find(c => c.id === expense.category);
                     const cat      = EXPENSE_CATEGORY_META[expense.category] || { label: customCat?.label || expense.category, emoji: customCat?.emoji || "✨", color: "bg-stone-500/15 text-stone-800" };
                     const cur      = CURRENCY_META[expense.currency];
-                    const isPayer  = expense.paidById === selectedId;
+                    const actualPaidById = expense.paidById || (expense as any).paid_by || (expense as any).payer_id;
+                    const isPayer  = actualPaidById === selectedId;
                     const baseAmt  = convertToBase(share, expense.currency, rates);
                     return (
                       <div key={expense.id} className="flex items-center gap-3 px-4 py-3">

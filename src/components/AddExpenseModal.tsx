@@ -24,7 +24,8 @@ export default function AddExpenseModal({ participants, initialExpense, onSave, 
   const [amount,      setAmount]      = useState(initialExpense?.amount.toString() ?? "");
   const [currency,    setCurrency]    = useState<Currency>(initialExpense?.currency ?? "CNY");
   const [category,    setCategory]    = useState<ExpenseCategory>(initialExpense?.category ?? "food");
-  const [paidById,    setPaidById]    = useState(initialExpense?.paidById ?? participants[0]?.id ?? "");
+  const actualInitialPayer = initialExpense ? (initialExpense.paidById || (initialExpense as any).paid_by || (initialExpense as any).payer_id) : undefined;
+  const [paidById,    setPaidById]    = useState(actualInitialPayer ?? participants[0]?.id ?? "");
   const [date,        setDate]        = useState(initialExpense?.date ?? new Date().toISOString().slice(0, 10));
   const [splitIds,    setSplitIds]    = useState<Set<string>>(
     () => new Set(initialExpense ? initialExpense.splits.map((s) => s.participantId) : participants.map((p) => p.id))
