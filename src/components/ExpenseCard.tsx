@@ -2,6 +2,7 @@
 
 import { Expense, Participant, EXPENSE_CATEGORY_META, CURRENCY_META, Currency } from "@/types/trip";
 import { formatCurrency } from "@/lib/utils";
+import { DEFAULT_RATES } from "@/lib/currency";
 import Avatar from "@/components/Avatar";
 import { useCurrency } from "@/contexts/CurrencyContext";
 
@@ -41,7 +42,11 @@ export default function ExpenseCard({ expense, participants, onEdit, onDelete, c
           <div className="flex flex-col items-end gap-0.5">
             <span className={`font-mono text-base font-black tabular-nums text-stone-800 dark:text-[#fdfbf7] ${expense.isExcluded ? 'line-through opacity-70' : ''}`}>
               {(() => {
-                const effectiveRate = Number((expense as any).custom_exchange_rate) || Number(expense.exchangeRate) || Number((expense as any).exchange_rate) || Number(expense.historicalRate) || 1;
+                let effectiveRate = Number((expense as any).custom_exchange_rate) || Number(expense.exchangeRate) || Number((expense as any).exchange_rate) || Number(expense.historicalRate) || 0;
+                if (effectiveRate <= 0 || effectiveRate === 1) {
+                  // If rate wasn't captured, we retroactively recalculate using a fallback so 1:1 foreign issues are bypassed
+                  effectiveRate = (expense.currency !== baseCurrency) ? (DEFAULT_RATES[baseCurrency as Currency]?.[expense.currency] || 1) : 1;
+                }
                 const totalBillTHB = (expense.currency !== baseCurrency && Number(expense.foreignAmount) > 0)
                   ? Number(expense.foreignAmount) * effectiveRate
                   : Number(expense.amount) || 0;
@@ -55,7 +60,10 @@ export default function ExpenseCard({ expense, participants, onEdit, onDelete, c
                   expense.currency
                 )} 
                 {(() => {
-                  const effectiveRate = Number((expense as any).custom_exchange_rate) || Number(expense.exchangeRate) || Number((expense as any).exchange_rate) || Number(expense.historicalRate) || 1;
+                  let effectiveRate = Number((expense as any).custom_exchange_rate) || Number(expense.exchangeRate) || Number((expense as any).exchange_rate) || Number(expense.historicalRate) || 0;
+                  if (effectiveRate <= 0 || effectiveRate === 1) {
+                    effectiveRate = (expense.currency !== baseCurrency) ? (DEFAULT_RATES[baseCurrency as Currency]?.[expense.currency] || 1) : 1;
+                  }
                   return effectiveRate !== 1 ? ` (@ ${effectiveRate})` : "";
                 })()}
               </span>

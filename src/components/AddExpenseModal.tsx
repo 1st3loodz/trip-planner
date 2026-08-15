@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Participant, Currency, ExpenseCategory, Expense, CURRENCY_META, EXPENSE_CATEGORY_META } from "@/types/trip";
 import { generateId } from "@/lib/utils";
+import { DEFAULT_RATES } from "@/lib/currency";
 import Avatar from "@/components/Avatar";
 import { useCurrency } from "@/contexts/CurrencyContext";
 
@@ -134,7 +135,10 @@ export default function AddExpenseModal({ participants, initialExpense, onSave, 
     const foreignNumSubmit = parseFloat(amount);
     if (!amount || isNaN(foreignNumSubmit) || foreignNumSubmit <= 0) errs.amount = "Enter a valid amount.";
     
-    let finalRate = isForeign ? (useCustomRate ? parseFloat(customRate) : (fetchedRate ?? rates[currency] ?? 1)) : 1;
+    let finalRate = isForeign ? (useCustomRate ? parseFloat(customRate) : (fetchedRate ?? rates[currency] ?? DEFAULT_RATES[baseCurrency as Currency]?.[currency] ?? 1)) : 1;
+    if (isForeign && finalRate === 1) {
+      finalRate = DEFAULT_RATES[baseCurrency as Currency]?.[currency] ?? 1;
+    }
     if (isForeign && (isNaN(finalRate) || finalRate <= 0)) {
       errs.rate = "Invalid exchange rate.";
     }
