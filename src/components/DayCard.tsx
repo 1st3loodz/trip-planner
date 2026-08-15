@@ -20,6 +20,14 @@ interface DayCardProps {
 export default function DayCard({ day, destination, tripStartDate, defaultOpen = true, dragHandleProps, onEditActivity, onDeleteActivity, customCategories = [] }: DayCardProps) {
   const [open, setOpen] = useState(defaultOpen);
 
+  // Compute this day's date dynamically from the trip start date + dayNumber offset.
+  // This is the single source of truth — never use day.date which can be stale.
+  const computedDayDate = (() => {
+    const d = new Date(tripStartDate);
+    d.setDate(d.getDate() + day.dayNumber - 1);
+    return d.toISOString().split("T")[0];
+  })();
+
   return (
     <section className="mb-5">
       {/* Day header — wooden sign style */}
@@ -60,7 +68,7 @@ export default function DayCard({ day, destination, tripStartDate, defaultOpen =
               <span className="font-pixel text-[10px] text-stone-800 dark:text-[#fdfbf7]">Day {day.dayNumber}</span>
               {day.label && <span className="font-mono text-xs text-stone-600 dark:text-[#f5ebd5]">— {day.label}</span>}
             </div>
-            <span className="font-mono text-[10px] text-stone-600 dark:text-stone-400">{formatDate(day.date)}</span>
+            <span className="font-mono text-[10px] text-stone-600 dark:text-stone-400">{formatDate(computedDayDate)}</span>
           </div>
 
           <div className="shrink-0 text-right">
@@ -77,22 +85,21 @@ export default function DayCard({ day, destination, tripStartDate, defaultOpen =
         </button>
       </div>
 
-      {open && (
-        <div className="mt-0 px-5 py-4 bg-[#f5eed7] dark:bg-[#28211d] border-2 border-t-0 border-stone-800 dark:border-[#54463d]">
-          {day.activities.length === 0 ? (
-            <Droppable droppableId={String(day.dayNumber)} type="activity">
-              {(provided) => (
-                <div ref={provided.innerRef} {...provided.droppableProps} className="min-h-[60px]">
+      {/* Always render the Droppable so collapsed days are valid drop targets */}
+      <Droppable droppableId={String(day.dayNumber)} type="activity">
+        {(provided) => (
+          <div
+            ref={provided.innerRef}
+            {...provided.droppableProps}
+            // When closed: hidden container at height 0, still in DOM for DnD
+            style={open ? undefined : { height: 0, overflow: "hidden", position: "absolute", pointerEvents: "none" }}
+          >
+            {open && (
+              <div className="mt-0 px-5 py-4 bg-[#f5eed7] dark:bg-[#28211d] border-2 border-t-0 border-stone-800 dark:border-[#54463d]">
+                {day.activities.length === 0 ? (
                   <p className="py-4 text-center font-mono text-xs text-amber-700 dark:text-amber-300">No entries yet.</p>
-                  {provided.placeholder}
-                </div>
-              )}
-            </Droppable>
-          ) : (
-            <Droppable droppableId={String(day.dayNumber)} type="activity">
-              {(provided) => (
-                <div ref={provided.innerRef} {...provided.droppableProps}>
-                  {day.activities.map((act, idx) => (
+                ) : (
+                  day.activities.map((act, idx) => (
                     <Draggable key={act.id} draggableId={act.id} index={idx}>
                       {(dragProvided, dragSnapshot) => (
                         <div
@@ -118,14 +125,14 @@ export default function DayCard({ day, destination, tripStartDate, defaultOpen =
                         </div>
                       )}
                     </Draggable>
-                  ))}
-                  {provided.placeholder}
-                </div>
-              )}
-            </Droppable>
-          )}
-        </div>
-      )}
+                  ))
+                )}
+              </div>
+            )}
+            {provided.placeholder}
+          </div>
+        )}
+      </Droppable>
     </section>
   );
 }

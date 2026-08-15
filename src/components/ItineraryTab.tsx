@@ -149,6 +149,7 @@ export default function ItineraryTab({ trip, onAddActivity, onEditActivity, onDe
               key={day.dayNumber}
               day={day}
               destination={trip.destination}
+              tripStartDate={trip.startDate}
               defaultOpen={false}
               customCategories={customCategories}
               onEditActivity={(dayNumber, activity) => setModalState({ mode: "edit", activity, dayNumber })}
