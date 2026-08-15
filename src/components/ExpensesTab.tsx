@@ -289,7 +289,7 @@ export default function ExpensesTab({
                         </div>
                       </div>
                     </div>
-                  </div>
+                  </ErrorBoundary>
                 );
               })}
             </div>
