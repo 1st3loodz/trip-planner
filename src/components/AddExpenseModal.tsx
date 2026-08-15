@@ -41,6 +41,17 @@ export default function AddExpenseModal({ participants, initialExpense, onSave, 
   const [errors, setErrors] = useState<Record<string,string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const [splitType, setSplitType] = useState<'EQUAL' | 'CUSTOM'>(
+    () => (initialExpense as any)?.splitType ?? 'EQUAL'
+  );
+  // Custom split amounts keyed by participantId
+  const [customAmounts, setCustomAmounts] = useState<Record<string, string>>(() => {
+    if (initialExpense?.splits && (initialExpense as any)?.splitType === 'CUSTOM') {
+      return Object.fromEntries(initialExpense.splits.map(s => [s.participantId, String(s.amount)]));
+    }
+    return Object.fromEntries(participants.map(p => [p.id, '']));
+  });
+
   const { baseCurrency, rates } = useCurrency();
 
   useEffect(() => {
@@ -143,9 +154,30 @@ export default function AddExpenseModal({ participants, initialExpense, onSave, 
 
     setIsSubmitting(true);
 
-    const splitArray = splitIds.size > 0 ? Array.from(splitIds) : [paidById];
+    let finalSplits: { participantId: string; amount: number }[];
     const finalBaseAmount = parseFloat((foreignNumSubmit * finalRate).toFixed(2));
-    const perPersonSplit = finalBaseAmount / splitArray.length;
+    if (splitType === 'CUSTOM') {
+      // Validate custom amounts sum to total
+      const allocated = participants.reduce((sum, p) => sum + (parseFloat(customAmounts[p.id] ?? '') || 0), 0);
+      const diff = Math.abs(allocated - foreignNumSubmit);
+      if (diff >= 0.01) {
+        setErrors(prev => ({ ...prev, customSplit: `Custom amounts must sum to ${foreignNumSubmit.toFixed(2)} ${currency}. Currently: ${allocated.toFixed(2)}` }));
+        setIsSubmitting(false);
+        return;
+      }
+      // Convert custom amounts to base currency proportionally
+      finalSplits = participants
+        .filter(p => (parseFloat(customAmounts[p.id] ?? '') || 0) > 0)
+        .map(p => {
+          const foreignShare = parseFloat(customAmounts[p.id] ?? '') || 0;
+          const baseShare = parseFloat((foreignShare * finalRate).toFixed(2));
+          return { participantId: p.id, amount: baseShare };
+        });
+    } else {
+      const splitArray = splitIds.size > 0 ? Array.from(splitIds) : [paidById];
+      const perPersonSplit = finalBaseAmount / splitArray.length;
+      finalSplits = splitArray.map((id) => ({ participantId: id, amount: parseFloat(perPersonSplit.toFixed(2)) }));
+    }
 
     onSave({
       id: initialExpense?.id ?? `e-${generateId()}`,
@@ -156,15 +188,16 @@ export default function AddExpenseModal({ participants, initialExpense, onSave, 
       paidById, 
       date: isoDate, 
       isExcluded,
+      splitType,
       paid_by: paidById,
-      split_with: splitArray,
+      split_with: finalSplits.map(s => s.participantId),
       expense_date: isoDate,
       foreignAmount: isForeign ? foreignNumSubmit : undefined,
       foreign_amount: isForeign ? foreignNumSubmit : undefined,
       exchangeRate: isForeign && useCustomRate ? finalRate : undefined,
       exchange_rate: isForeign && useCustomRate ? finalRate : undefined,
       historicalRate: finalRate,
-      splits: splitArray.map((id) => ({ participantId: id, amount: parseFloat(perPersonSplit.toFixed(2)) })),
+      splits: finalSplits,
       createdAt: initialExpense?.createdAt ?? new Date().toISOString(),
       historicalBaseAmount: finalBaseAmount,
     } as any);
@@ -320,31 +353,112 @@ export default function AddExpenseModal({ participants, initialExpense, onSave, 
 
           {/* Split Between */}
           <div>
-            <div className="mb-1.5 flex items-center justify-between">
-              <label className="font-pixel text-[8px] uppercase tracking-widest text-stone-600 dark:text-stone-400">
-                Split Between *{" "}{splitIds.size > 0 && <span className="ml-1 text-[#4a7c59] dark:text-[#2d5a3d]">({splitIds.size} selected)</span>}
-              </label>
-              <div className="flex gap-2">
-                <button type="button" onClick={() => setSplitIds(new Set(participants.map((p) => p.id)))} className="font-mono text-[10px] font-semibold text-stone-800 dark:text-[#fdfbf7] hover:underline">All</button>
-                <span className="font-mono text-[10px] text-stone-400 dark:text-stone-600">·</span>
-                <button type="button" onClick={() => setSplitIds(new Set())} className="font-mono text-[10px] font-semibold text-stone-500 dark:text-stone-500 hover:underline">Clear</button>
-              </div>
-            </div>
-            {errors.split && <p className="mb-2 font-mono text-[10px] text-red-600 dark:text-red-400">{errors.split}</p>}
-            <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
-              {participants.map((p) => {
-                const checked = splitIds.has(p.id);
-                return (
-                  <button key={p.id} type="button" onClick={() => toggleSplit(p.id)}
-                    className={`flex items-center gap-2 border-2 px-3 py-2 transition-all ${checked ? "border-stone-800 bg-[#f5eed7] shadow-[2px_2px_0_#292524] dark:border-[#54463d] dark:bg-[#362d28] dark:shadow-[2px_2px_0_#1e1815]" : "border-stone-400 bg-[#fdfbf7] opacity-60 hover:opacity-100 dark:border-stone-600 dark:bg-[#28211d]"}`}>
-                    <Avatar name={p.name} colorClass={p.color} size="xs" tooltip={false} />
-                    <span className={`font-mono text-xs font-semibold ${checked ? "text-stone-900 dark:text-[#fdfbf7]" : "text-stone-500 dark:text-stone-500"}`}>{p.name}</span>
-                    <span className={`ml-auto flex h-4 w-4 items-center justify-center border-2 text-[10px] transition-all ${checked ? "border-stone-800 bg-[#4a7c59] text-[#fdfbf7] dark:border-[#2d5a3d] dark:bg-[#2d5a3d]" : "border-stone-300 text-transparent dark:border-stone-600"}`}>✓</span>
-                  </button>
-                );
-              })}
+            <label className="mb-1.5 block font-pixel text-[8px] uppercase tracking-widest text-stone-600 dark:text-stone-400">Split Mode</label>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setSplitType('EQUAL')}
+                className={`flex items-center justify-center gap-2 border-2 px-3 py-2.5 font-mono text-xs font-semibold transition-all ${
+                  splitType === 'EQUAL'
+                    ? 'border-stone-800 bg-[#f5eed7] text-stone-900 shadow-[2px_2px_0_#292524] dark:border-[#54463d] dark:bg-[#362d28] dark:text-[#fdfbf7]'
+                    : 'border-stone-400 bg-[#fdfbf7] text-stone-500 hover:border-stone-600 dark:border-stone-600 dark:bg-[#28211d]'
+                }`}
+              >
+                ⚖️ Equally
+              </button>
+              <button
+                type="button"
+                onClick={() => setSplitType('CUSTOM')}
+                className={`flex items-center justify-center gap-2 border-2 px-3 py-2.5 font-mono text-xs font-semibold transition-all ${
+                  splitType === 'CUSTOM'
+                    ? 'border-stone-800 bg-[#f5eed7] text-stone-900 shadow-[2px_2px_0_#292524] dark:border-[#54463d] dark:bg-[#362d28] dark:text-[#fdfbf7]'
+                    : 'border-stone-400 bg-[#fdfbf7] text-stone-500 hover:border-stone-600 dark:border-stone-600 dark:bg-[#28211d]'
+                }`}
+              >
+                ✏️ Custom
+              </button>
             </div>
           </div>
+
+          {splitType === 'EQUAL' ? (
+            /* ── EQUAL mode: checkbox list ── */
+            <div>
+              <div className="mb-1.5 flex items-center justify-between">
+                <label className="font-pixel text-[8px] uppercase tracking-widest text-stone-600 dark:text-stone-400">
+                  Split Between *{' '}{splitIds.size > 0 && <span className="ml-1 text-[#4a7c59] dark:text-[#2d5a3d]">({splitIds.size} selected)</span>}
+                </label>
+                <div className="flex gap-2">
+                  <button type="button" onClick={() => setSplitIds(new Set(participants.map((p) => p.id)))} className="font-mono text-[10px] font-semibold text-stone-800 dark:text-[#fdfbf7] hover:underline">All</button>
+                  <span className="font-mono text-[10px] text-stone-400 dark:text-stone-600">·</span>
+                  <button type="button" onClick={() => setSplitIds(new Set())} className="font-mono text-[10px] font-semibold text-stone-500 dark:text-stone-500 hover:underline">Clear</button>
+                </div>
+              </div>
+              {errors.split && <p className="mb-2 font-mono text-[10px] text-red-600 dark:text-red-400">{errors.split}</p>}
+              <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
+                {participants.map((p) => {
+                  const checked = splitIds.has(p.id);
+                  return (
+                    <button key={p.id} type="button" onClick={() => toggleSplit(p.id)}
+                      className={`flex items-center gap-2 border-2 px-3 py-2 transition-all ${checked ? 'border-stone-800 bg-[#f5eed7] shadow-[2px_2px_0_#292524] dark:border-[#54463d] dark:bg-[#362d28] dark:shadow-[2px_2px_0_#1e1815]' : 'border-stone-400 bg-[#fdfbf7] opacity-60 hover:opacity-100 dark:border-stone-600 dark:bg-[#28211d]'}`}>
+                      <Avatar name={p.name} colorClass={p.color} size="xs" tooltip={false} />
+                      <span className={`font-mono text-xs font-semibold ${checked ? 'text-stone-900 dark:text-[#fdfbf7]' : 'text-stone-500 dark:text-stone-500'}`}>{p.name}</span>
+                      <span className={`ml-auto flex h-4 w-4 items-center justify-center border-2 text-[10px] transition-all ${checked ? 'border-stone-800 bg-[#4a7c59] text-[#fdfbf7] dark:border-[#2d5a3d] dark:bg-[#2d5a3d]' : 'border-stone-300 text-transparent dark:border-stone-600'}`}>✓</span>
+                    </button>
+                  );
+                })}
+              </div>
+              {/* Per-person equal preview */}
+              {perPerson && (
+                <div className="mt-3 flex items-center justify-between border-2 border-stone-800 bg-[#e8dcc4] px-4 py-3 dark:border-[#54463d] dark:bg-[#362d28]">
+                  <span className="font-mono text-xs font-semibold text-stone-800 dark:text-[#f5ebd5]">{splitIds.size === 0 ? '100% Personal (Auto-assigned):' : 'Each person pays:'}</span>
+                  <span className="font-mono text-sm font-black tabular-nums text-stone-900 dark:text-[#fdfbf7]">{CURRENCY_META[currency].symbol}{perPerson} {currency}</span>
+                </div>
+              )}
+            </div>
+          ) : (
+            /* ── CUSTOM mode: individual amount inputs ── */
+            <div>
+              <label className="mb-2 block font-pixel text-[8px] uppercase tracking-widest text-stone-600 dark:text-stone-400">Custom Amounts per Person ({currency})</label>
+              <div className="space-y-2">
+                {participants.map((p) => {
+                  const val = customAmounts[p.id] ?? '';
+                  return (
+                    <div key={p.id} className="flex items-center gap-3 border-2 border-stone-400 bg-[#fdfbf7] px-3 py-2 dark:border-stone-600 dark:bg-[#28211d]">
+                      <Avatar name={p.name} colorClass={p.color} size="xs" tooltip={false} />
+                      <span className="font-mono text-xs font-semibold text-stone-700 dark:text-[#fdfbf7] min-w-0 flex-1 truncate">{p.name}</span>
+                      <input
+                        type="number"
+                        min="0"
+                        step="any"
+                        placeholder="0.00"
+                        value={val}
+                        onChange={(e) => setCustomAmounts(prev => ({ ...prev, [p.id]: e.target.value }))}
+                        className="w-24 border-2 border-stone-400 bg-[#fdfbf7] px-2 py-1 font-mono text-xs text-right text-stone-900 outline-none focus:border-stone-800 dark:border-stone-600 dark:bg-[#1e1815] dark:text-[#fdfbf7]"
+                      />
+                      <span className="font-mono text-[10px] text-stone-500 dark:text-stone-400 shrink-0">{currency}</span>
+                    </div>
+                  );
+                })}
+              </div>
+              {/* Real-time balance validator */}
+              {(() => {
+                const allocated = participants.reduce((sum, p) => sum + (parseFloat(customAmounts[p.id] ?? '') || 0), 0);
+                const diff = Math.abs(allocated - foreignNum);
+                const isBalanced = !isNaN(foreignNum) && foreignNum > 0 && diff < 0.01;
+                return (
+                  <div className={`mt-2 flex items-center justify-between border-2 px-3 py-2 font-mono text-xs ${
+                    isBalanced
+                      ? 'border-green-600 bg-green-50 text-green-800 dark:border-green-700 dark:bg-green-900/20 dark:text-green-300'
+                      : 'border-red-400 bg-red-50 text-red-700 dark:border-red-700 dark:bg-red-900/20 dark:text-red-300'
+                  }`}>
+                    <span>Allocated: {CURRENCY_META[currency].symbol}{allocated.toFixed(2)}</span>
+                    <span className="font-bold">{isBalanced ? '✓ Balanced' : `⚠ Need ${CURRENCY_META[currency].symbol}${foreignNum.toFixed(2)} total`}</span>
+                  </div>
+                );
+              })()}
+              {errors.customSplit && <p className="mt-1 font-mono text-[10px] text-red-600 dark:text-red-400">{errors.customSplit}</p>}
+            </div>
+          )}
 
           {/* Exclude Checkbox */}
           <div className="flex items-start gap-3 border-2 border-stone-400 bg-[#fdfbf7] px-4 py-3 dark:border-stone-600 dark:bg-[#1e1815]">
@@ -360,14 +474,6 @@ export default function AddExpenseModal({ participants, initialExpense, onSave, 
               <span className="text-[10px] text-stone-500 dark:text-stone-500">Skip calculation (e.g. paid in advance, personal expense).</span>
             </label>
           </div>
-
-          {/* Per-person preview */}
-          {perPerson && (
-            <div className="flex items-center justify-between border-2 border-stone-800 bg-[#e8dcc4] px-4 py-3 dark:border-[#54463d] dark:bg-[#362d28]">
-              <span className="font-mono text-xs font-semibold text-stone-800 dark:text-[#f5ebd5]">{splitIds.size === 0 ? "100% Personal (Auto-assigned):" : "Each person pays:"}</span>
-              <span className="font-mono text-sm font-black tabular-nums text-stone-900 dark:text-[#fdfbf7]">{CURRENCY_META[currency].symbol}{perPerson} {currency}</span>
-            </div>
-          )}
         </div>
 
         {/* Footer */}

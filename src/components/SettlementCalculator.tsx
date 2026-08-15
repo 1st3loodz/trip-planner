@@ -417,8 +417,12 @@ export default function SettlementCalculator({ settlements, participants, onEdit
                                       </span>
                                       <span className="shrink-0 text-sm">{cat.emoji}</span>
                                       <div className="flex-1 min-w-0 flex flex-col">
-                                        <span className={`truncate font-semibold transition-all duration-300 ${isSubSettled ? "line-through text-stone-500 dark:text-stone-600" : "text-stone-700 dark:text-[#fdfbf7]"}`}>
-                                          {expDesc} {dateLabel && <span className="font-mono text-[9px] font-normal text-stone-500 dark:text-stone-400 ml-1">({dateLabel})</span>}
+                                        <span className={`truncate font-semibold transition-all duration-300 ${isSubSettled ? 'line-through text-stone-500 dark:text-stone-600' : 'text-stone-700 dark:text-[#fdfbf7]'}`}>
+                                          {expDesc}{' '}
+                                          {(inv.expense as any)?.splitType === 'CUSTOM' && (
+                                            <span className="inline-block border border-amber-400 bg-amber-50 px-1 py-0 font-pixel text-[7px] uppercase text-amber-700 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-300 ml-1">Custom</span>
+                                          )}
+                                          {dateLabel && <span className="font-mono text-[9px] font-normal text-stone-500 dark:text-stone-400 ml-1">({dateLabel})</span>}
                                         </span>
                                         <span className="text-[9px] text-stone-500 dark:text-stone-400">
                                           {inv.isCredit

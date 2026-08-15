@@ -80,10 +80,34 @@ export default function ExpenseCard({ expense, participants, onEdit, onDelete, c
         )}
       </div>
 
-      <div className="flex flex-wrap items-center gap-1.5">
-        <span className="font-pixel text-[8px] uppercase tracking-widest text-stone-500 dark:text-stone-400 shrink-0">Split</span>
-        <div className="flex flex-wrap items-center gap-1">{splitMembers.map((p) => <Avatar key={p.id} name={p.name} colorClass={p.color} size="xs" />)}</div>
-        <span className="font-mono text-[10px] text-stone-500 dark:text-stone-400">({splitMembers.length} people · {formatCurrency(perPerson, expense.currency)} each)</span>
+      <div className="space-y-1.5">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="font-pixel text-[8px] uppercase tracking-widest text-stone-500 dark:text-stone-400 shrink-0">Split</span>
+          {(expense as any).splitType === 'CUSTOM' && (
+            <span className="border border-amber-400 bg-amber-50 px-1.5 py-0.5 font-pixel text-[7px] uppercase text-amber-700 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-300">Custom</span>
+          )}
+          <div className="flex flex-wrap items-center gap-1">
+            {splitMembers.map((p) => <Avatar key={p.id} name={p.name} colorClass={p.color} size="xs" />)}
+          </div>
+          {(expense as any).splitType !== 'CUSTOM' && (
+            <span className="font-mono text-[10px] text-stone-500 dark:text-stone-400">({splitMembers.length} people · {formatCurrency(perPerson, expense.currency)} each)</span>
+          )}
+        </div>
+        {(expense as any).splitType === 'CUSTOM' && expense.splits.length > 0 && (
+          <div className="ml-1 space-y-0.5">
+            {expense.splits.map((split) => {
+              const member = participants.find(p => p.id === split.participantId);
+              if (!member) return null;
+              return (
+                <div key={split.participantId} className="flex items-center gap-1.5">
+                  <Avatar name={member.name} colorClass={member.color} size="xs" />
+                  <span className="font-mono text-[10px] text-stone-600 dark:text-stone-400">{member.name}:</span>
+                  <span className="font-mono text-[10px] font-semibold text-stone-800 dark:text-[#fdfbf7]">{formatCurrency(split.amount, expense.currency)}</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );

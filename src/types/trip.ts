@@ -82,6 +82,8 @@ export interface Expense {
   category: ExpenseCategory;
   paidById: string;
   splits: ExpenseSplit[];
+  /** Whether splits are equal among members or custom per-member amounts */
+  splitType?: 'EQUAL' | 'CUSTOM';
   /** Date of the expense: "YYYY-MM-DD" */
   date: string;
   /** ISO timestamp of when the record was created */
