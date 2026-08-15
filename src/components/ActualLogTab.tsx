@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import { createClient } from "@/utils/supabase/client";
 import { DayPlan } from "@/types/trip";
 import EditActualModal from "./EditActualModal";
@@ -20,6 +21,7 @@ export interface ActualLogEntry {
 interface ActualLogTabProps {
   tripId: string;
   days: DayPlan[];
+  tripStartDate: string;
 }
 
 // ─── Utility helpers ───────────────────────────────────────────────────────────
@@ -32,10 +34,19 @@ function safeDays(d: DayPlan[] | undefined | null): DayPlan[] {
   return Array.isArray(d) ? d : [];
 }
 
-function buildDayLabel(dayNum: number, days: DayPlan[]): string {
-  const plan = safeDays(days).find((d) => d.dayNumber === dayNum);
-  if (!plan?.date) return `Day ${dayNum}`;
-  const dt = new Date(plan.date + "T00:00:00");
+/**
+ * Compute a day's ISO date string directly from the trip start date + offset.
+ * This is the single source of truth — never rely on day.date which can be stale.
+ */
+function computeDateForDay(tripStartDate: string, dayNum: number): string {
+  const d = new Date(tripStartDate + "T00:00:00");
+  d.setDate(d.getDate() + dayNum - 1);
+  return d.toISOString().split("T")[0];
+}
+
+function buildDayLabel(dayNum: number, tripStartDate: string): string {
+  const isoDate = computeDateForDay(tripStartDate, dayNum);
+  const dt = new Date(isoDate + "T00:00:00");
   const dd   = String(dt.getDate()).padStart(2, "0");
   const mm   = String(dt.getMonth() + 1).padStart(2, "0");
   const yyyy = dt.getFullYear();
@@ -76,7 +87,7 @@ const INPUT =
 
 // ─── Component ──────────────────────────────────────────────────────────────────
 
-export default function ActualLogTab({ tripId, days }: ActualLogTabProps) {
+export default function ActualLogTab({ tripId, days, tripStartDate }: ActualLogTabProps) {
 
   // ── Core data state ───────────────────────────────────────────────────────────
   const [entries,      setEntries]      = useState<ActualLogEntry[]>([]);
@@ -207,7 +218,7 @@ export default function ActualLogTab({ tripId, days }: ActualLogTabProps) {
     }
   };
 
-  // ── Delete an entry ───────────────────────────────────────────────────────────
+  // ── Edit save ────────────────────────────────────────────────────────────────
   const handleEditSave = async (id: string, updates: Partial<ActualLogEntry>) => {
     const sb = createClient();
     const { data, error } = await sb.from("actual_logs").update(updates).eq("id", id).select("*").single();
@@ -219,6 +230,7 @@ export default function ActualLogTab({ tripId, days }: ActualLogTabProps) {
     }
   };
 
+  // ── Delete an entry ───────────────────────────────────────────────────────────
   const handleDelete = async (id: string) => {
     try {
       const sb = createClient();
@@ -233,6 +245,63 @@ export default function ActualLogTab({ tripId, days }: ActualLogTabProps) {
     }
   };
 
+  // ── Drag-and-Drop: move log entries across or within day groups ──────────────
+  const handleDragEnd = useCallback(async (result: DropResult) => {
+    if (!result.destination) return;
+    const { source, destination } = result;
+    if (source.droppableId === destination.droppableId && source.index === destination.index) return;
+
+    const sourceDayNum = parseInt(source.droppableId, 10);
+    const destDayNum   = parseInt(destination.droppableId, 10);
+
+    // Build a flat snapshot of the current entries
+    const allEntries = safeArr(entries);
+
+    // Group by day preserving current order
+    const grouped: Record<number, ActualLogEntry[]> = {};
+    for (const e of allEntries) {
+      const k = Number(e.day_number);
+      if (!grouped[k]) grouped[k] = [];
+      grouped[k].push(e);
+    }
+
+    const sourceList = [...(grouped[sourceDayNum] ?? [])];
+    const destList   = sourceDayNum === destDayNum ? sourceList : [...(grouped[destDayNum] ?? [])];
+
+    const [movedEntry] = sourceList.splice(source.index, 1);
+    // Construct a brand new object so React detects the reference change
+    const updatedEntry: ActualLogEntry = { ...movedEntry, day_number: destDayNum };
+    destList.splice(destination.index, 0, updatedEntry);
+
+    // Build new full entries array immutably
+    const newGrouped = { ...grouped, [sourceDayNum]: sourceList, [destDayNum]: destList };
+    const newEntries = Object.values(newGrouped).flat();
+
+    // Optimistic UI update immediately
+    setEntries(newEntries);
+
+    // Expand destination day so user sees the dropped card
+    setExpandedDays((prev) => new Set([...prev, destDayNum]));
+
+    // Persist to Supabase (strictly schema-compliant: only update day_number)
+    try {
+      const sb = createClient();
+      const { error } = await sb
+        .from("actual_logs")
+        .update({ day_number: destDayNum })
+        .eq("id", movedEntry.id);
+
+      if (error) {
+        console.warn("[ActualLogTab] drag-update error:", error.message);
+        // Rollback on failure
+        setEntries(allEntries);
+      }
+    } catch (err) {
+      console.error("[ActualLogTab] unexpected drag-update error:", err);
+      setEntries(allEntries);
+    }
+  }, [entries]);
+
   // ── Derived: group safe entries by day_number ─────────────────────────────────
   const safeEntries = safeArr(entries);
 
@@ -243,7 +312,10 @@ export default function ActualLogTab({ tripId, days }: ActualLogTabProps) {
     return acc;
   }, {});
 
-  const sortedDayNums = Object.keys(grouped).map(Number).sort((a, b) => a - b);
+  // Ensure all planned days are shown (even if empty), plus any extra days with entries
+  const plannedDayNums = safeDays(days).map((d) => d.dayNumber);
+  const entryDayNums   = Object.keys(grouped).map(Number);
+  const allDayNums     = Array.from(new Set([...plannedDayNums, ...entryDayNums])).sort((a, b) => a - b);
 
   // ─── Render ──────────────────────────────────────────────────────────────────
   return (
@@ -274,7 +346,7 @@ export default function ActualLogTab({ tripId, days }: ActualLogTabProps) {
               >
                 {safeDays(days).map((day) => (
                   <option key={day.dayNumber} value={String(day.dayNumber)}>
-                    {buildDayLabel(day.dayNumber, days)}
+                    {buildDayLabel(day.dayNumber, tripStartDate)}
                   </option>
                 ))}
               </select>
@@ -380,175 +452,219 @@ export default function ActualLogTab({ tripId, days }: ActualLogTabProps) {
           </button>
         </div>
 
-      ) : safeEntries.length === 0 ? (
-
-        <div className="py-16 text-center border-2 border-dashed border-stone-400 bg-stone-200/50 dark:border-stone-600 dark:bg-stone-800/30">
-          <div className="mb-3 text-4xl">📜</div>
-          <div className="text-stone-500 font-mono p-4">NO ACTUAL LOGS RECORDED YET</div>
-          <p className="font-mono text-[10px] text-stone-400 dark:text-stone-500">
-            Use the form above to capture what really happened!
-          </p>
-        </div>
-
       ) : (
 
-        /* ── Day-grouped accordion timeline ───────────────────────────────── */
-        <div className="space-y-4">
-          {sortedDayNums.map((dayNum) => {
-            const dayEntries = (grouped[dayNum] || []);
-            const isOpen     = expandedDays.has(dayNum);
-            const dayPlan    = safeDays(days).find((d) => d.dayNumber === dayNum);
+        /* ── Day-grouped accordion timeline with drag-and-drop ─────────────── */
+        <DragDropContext onDragEnd={handleDragEnd}>
+          <div className="space-y-4">
+            {allDayNums.map((dayNum) => {
+              const dayEntries = grouped[dayNum] ?? [];
+              const isOpen     = expandedDays.has(dayNum);
 
-            return (
-              <div
-                key={dayNum}
-                className="border-4 border-stone-800 dark:border-[#54463d] bg-[#fdfbf7] dark:bg-[#28211d] shadow-[4px_4px_0_#292524] dark:shadow-[4px_4px_0_#1e1815] overflow-hidden"
-              >
+              // Compute the date dynamically from tripStartDate — single source of truth
+              const computedDate = computeDateForDay(tripStartDate, dayNum);
 
-                {/* ── Clickable Day accordion header ──────────────────────── */}
-                <button
-                  type="button"
-                  onClick={() => toggleDay(dayNum)}
-                  className={[
-                    "w-full flex items-center gap-3 px-4 py-3.5 text-left transition-colors duration-150",
-                    isOpen
-                      ? "bg-stone-800 dark:bg-[#1e1815]"
-                      : "bg-[#e8dcc4] dark:bg-[#362d28] hover:bg-[#d8ccb4] dark:hover:bg-[#463d38]",
-                  ].join(" ")}
+              return (
+                <div
+                  key={dayNum}
+                  className="border-4 border-stone-800 dark:border-[#54463d] bg-[#fdfbf7] dark:bg-[#28211d] shadow-[4px_4px_0_#292524] dark:shadow-[4px_4px_0_#1e1815] overflow-hidden"
                 >
-                  {/* Toggle icon */}
-                  <div
+
+                  {/* ── Clickable Day accordion header ──────────────────────── */}
+                  <button
+                    type="button"
+                    onClick={() => toggleDay(dayNum)}
                     className={[
-                      "flex h-7 w-7 shrink-0 items-center justify-center border-2 font-pixel text-[12px] transition-colors",
+                      "w-full flex items-center gap-3 px-4 py-3.5 text-left transition-colors duration-150",
                       isOpen
-                        ? "border-[#fdfbf7] text-stone-800 bg-[#fdfbf7]"
-                        : "border-stone-800 dark:border-[#54463d] text-stone-800 dark:text-[#fdfbf7] bg-[#fdfbf7] dark:bg-[#28211d]",
+                        ? "bg-stone-800 dark:bg-[#1e1815]"
+                        : "bg-[#e8dcc4] dark:bg-[#362d28] hover:bg-[#d8ccb4] dark:hover:bg-[#463d38]",
                     ].join(" ")}
                   >
-                    {isOpen ? "－" : "＋"}
-                  </div>
-
-                  {/* Day label */}
-                  <div className="flex-1 min-w-0">
-                    <span
+                    {/* Toggle icon */}
+                    <div
                       className={[
-                        "font-pixel text-[10px] uppercase tracking-wider",
-                        isOpen ? "text-[#fdfbf7]" : "text-stone-800 dark:text-[#fdfbf7]",
+                        "flex h-7 w-7 shrink-0 items-center justify-center border-2 font-pixel text-[12px] transition-colors",
+                        isOpen
+                          ? "border-[#fdfbf7] text-stone-800 bg-[#fdfbf7]"
+                          : "border-stone-800 dark:border-[#54463d] text-stone-800 dark:text-[#fdfbf7] bg-[#fdfbf7] dark:bg-[#28211d]",
                       ].join(" ")}
                     >
-                      {buildDayLabel(dayNum, days)}
-                    </span>
-                    {dayPlan?.date && isOpen && (
-                      <span className="ml-3 font-mono text-[9px] text-stone-400 dark:text-stone-500">
-                        {buildDisplayDate(dayPlan.date)}
-                      </span>
-                    )}
-                  </div>
+                      {isOpen ? "－" : "＋"}
+                    </div>
 
-                  {/* Entry count badge */}
-                  <span
-                    className={[
-                      "shrink-0 font-mono text-[9px] px-2 py-0.5",
-                      isOpen
-                        ? "bg-[#fdfbf7]/20 text-[#fdfbf7] border border-[#fdfbf7]/30"
-                        : "bg-stone-200 dark:bg-[#28211d] text-stone-600 dark:text-stone-400 border border-stone-300 dark:border-stone-600",
-                    ].join(" ")}
-                  >
-                    {dayEntries.length} event{dayEntries.length !== 1 ? "s" : ""}
-                  </span>
-
-                  {/* Chevron */}
-                  <span
-                    className={[
-                      "shrink-0 font-mono text-sm transition-transform duration-200",
-                      isOpen ? "text-[#fdfbf7]" : "text-stone-500 dark:text-stone-400",
-                    ].join(" ")}
-                    style={{ transform: isOpen ? "rotate(180deg)" : "rotate(0deg)" }}
-                  >
-                    ▼
-                  </span>
-                </button>
-
-                {/* ── Expandable entry list ────────────────────────────────── */}
-                {isOpen && (
-                  <div className="divide-y-2 divide-stone-100 dark:divide-stone-700/60">
-                    {(dayEntries || []).map((entry, idx) => (
-                      <div
-                        key={entry.id}
-                        className="group flex items-start gap-3 px-4 py-3.5 bg-[#fdfbf7] dark:bg-[#28211d] hover:bg-[#f5eed7] dark:hover:bg-[#2d2620] transition-colors duration-100"
+                    {/* Day label — computed dynamically from tripStartDate */}
+                    <div className="flex-1 min-w-0">
+                      <span
+                        className={[
+                          "font-pixel text-[10px] uppercase tracking-wider",
+                          isOpen ? "text-[#fdfbf7]" : "text-stone-800 dark:text-[#fdfbf7]",
+                        ].join(" ")}
                       >
-                        {/* Timeline connector dot */}
-                        <div className="relative flex shrink-0 flex-col items-center pt-0.5" style={{ width: 28 }}>
-                          <div
-                            className="z-10 h-5 w-5 flex items-center justify-center text-[10px]"
-                            style={{
-                              background: "#fef9c3",
-                              border:     "2px solid #fcd34d",
-                              boxShadow:  "1px 1px 0 #fcd34d",
-                            }}
-                          >
-                            {idx + 1}
-                          </div>
-                          {idx !== dayEntries.length - 1 && (
-                            <div
-                              className="mt-1.5 w-px flex-1 min-h-3"
-                              style={{
-                                background: "linear-gradient(180deg, #c8a96e 0%, transparent 100%)",
-                              }}
-                            />
-                          )}
-                        </div>
+                        {buildDayLabel(dayNum, tripStartDate)}
+                      </span>
+                      {isOpen && (
+                        <span className="ml-3 font-mono text-[9px] text-stone-400 dark:text-stone-500">
+                          {buildDisplayDate(computedDate)}
+                        </span>
+                      )}
+                    </div>
 
-                        {/* Entry content */}
-                        <div className="flex-1 min-w-0">
-                          {/* Time range + badge */}
-                          <div className="mb-1.5 flex flex-wrap items-center gap-2">
-                            <span className="font-mono text-xs font-bold tabular-nums text-stone-800 dark:text-[#fdfbf7]">
-                              {buildTimeRange(entry.from_time, entry.to_time)}
-                            </span>
-                            <span
-                              className="font-mono text-[8px] px-1.5 py-0.5 text-stone-700 dark:text-stone-300"
-                              style={{ background: "#f5eed7", border: "1.5px solid #c8a96e" }}
-                            >
-                              ACTUAL
-                            </span>
-                          </div>
-                          {/* Details text */}
-                          <p className="font-mono text-sm leading-relaxed text-stone-800 dark:text-[#fdfbf7]">
-                            {entry.details}
-                          </p>
-                        </div>
+                    {/* Entry count badge */}
+                    <span
+                      className={[
+                        "shrink-0 font-mono text-[9px] px-2 py-0.5",
+                        isOpen
+                          ? "bg-[#fdfbf7]/20 text-[#fdfbf7] border border-[#fdfbf7]/30"
+                          : "bg-stone-200 dark:bg-[#28211d] text-stone-600 dark:text-stone-400 border border-stone-300 dark:border-stone-600",
+                      ].join(" ")}
+                    >
+                      {dayEntries.length} event{dayEntries.length !== 1 ? "s" : ""}
+                    </span>
 
-                        {/* Delete — hover-reveal */}
-                        <div className="flex shrink-0 items-start gap-1 pt-0.5 opacity-100 transition-opacity duration-150 md:opacity-0 md:group-hover:opacity-100">
-                          <button
-                            onClick={() => setEditingEntry(entry)}
-                            title="Edit entry"
-                            className="game-btn flex h-7 w-7 items-center justify-center font-mono text-xs bg-[#f5eed7] text-stone-800 border-2 border-stone-800 dark:bg-[#362d28] dark:text-[#fdfbf7] dark:border-[#54463d]"
-                          >
-                            ?
-                          </button>
-                          <button
-                            onClick={() => handleDelete(entry.id)}
-                            title="Delete entry"
-                            className="game-btn flex h-7 w-7 items-center justify-center font-mono text-xs bg-red-50 text-red-700 border-2 border-red-300 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800"
-                          >
-                            🗑
-                          </button>
-                        </div>
+                    {/* Chevron */}
+                    <span
+                      className={[
+                        "shrink-0 font-mono text-sm transition-transform duration-200",
+                        isOpen ? "text-[#fdfbf7]" : "text-stone-500 dark:text-stone-400",
+                      ].join(" ")}
+                      style={{ transform: isOpen ? "rotate(180deg)" : "rotate(0deg)" }}
+                    >
+                      ▼
+                    </span>
+                  </button>
+
+                  {/* ── Droppable zone — always in DOM so collapsed days accept drops */}
+                  <Droppable droppableId={String(dayNum)} type="actual-entry">
+                    {(provided, snapshot) => (
+                      <div
+                        ref={provided.innerRef}
+                        {...provided.droppableProps}
+                        style={isOpen ? undefined : { height: 0, overflow: "hidden", position: "absolute", pointerEvents: "none" }}
+                        className={snapshot.isDraggingOver && isOpen ? "bg-amber-50/50 dark:bg-amber-900/10" : ""}
+                      >
+                        {isOpen && (
+                          <div className="divide-y-2 divide-stone-100 dark:divide-stone-700/60">
+                            {dayEntries.length === 0 ? (
+                              <p className="py-6 text-center font-mono text-xs text-amber-700 dark:text-amber-300">
+                                No entries yet. Drop one here!
+                              </p>
+                            ) : (
+                              dayEntries.map((entry, idx) => (
+                                <Draggable key={entry.id} draggableId={entry.id} index={idx}>
+                                  {(dragProvided, dragSnapshot) => (
+                                    <div
+                                      ref={dragProvided.innerRef}
+                                      {...dragProvided.draggableProps}
+                                      style={{
+                                        ...dragProvided.draggableProps.style,
+                                        opacity: dragSnapshot.isDragging ? 0.85 : 1,
+                                        zIndex: dragSnapshot.isDragging ? 100 : undefined,
+                                      }}
+                                      className="group flex items-start gap-3 px-4 py-3.5 bg-[#fdfbf7] dark:bg-[#28211d] hover:bg-[#f5eed7] dark:hover:bg-[#2d2620] transition-colors duration-100"
+                                    >
+                                      {/* Drag handle */}
+                                      <div
+                                        {...dragProvided.dragHandleProps}
+                                        className="mt-1 flex shrink-0 items-center justify-center w-5 h-6 cursor-grab active:cursor-grabbing text-stone-300 hover:text-stone-500 dark:text-stone-600 dark:hover:text-stone-400 touch-none select-none"
+                                        title="Drag to move this log entry"
+                                      >
+                                        <svg width="10" height="16" viewBox="0 0 10 16" fill="currentColor">
+                                          <circle cx="3" cy="3"  r="1.5" />
+                                          <circle cx="7" cy="3"  r="1.5" />
+                                          <circle cx="3" cy="8"  r="1.5" />
+                                          <circle cx="7" cy="8"  r="1.5" />
+                                          <circle cx="3" cy="13" r="1.5" />
+                                          <circle cx="7" cy="13" r="1.5" />
+                                        </svg>
+                                      </div>
+
+                                      {/* Timeline connector dot */}
+                                      <div className="relative flex shrink-0 flex-col items-center pt-0.5" style={{ width: 28 }}>
+                                        <div
+                                          className="z-10 h-5 w-5 flex items-center justify-center text-[10px]"
+                                          style={{
+                                            background: "#fef9c3",
+                                            border:     "2px solid #fcd34d",
+                                            boxShadow:  "1px 1px 0 #fcd34d",
+                                          }}
+                                        >
+                                          {idx + 1}
+                                        </div>
+                                        {idx !== dayEntries.length - 1 && !dragSnapshot.isDragging && (
+                                          <div
+                                            className="mt-1.5 w-px flex-1 min-h-3"
+                                            style={{
+                                              background: "linear-gradient(180deg, #c8a96e 0%, transparent 100%)",
+                                            }}
+                                          />
+                                        )}
+                                      </div>
+
+                                      {/* Entry content */}
+                                      <div className="flex-1 min-w-0">
+                                        {/* Day badge — always reflects current day_number from entry state */}
+                                        <div className="mb-1.5 flex flex-wrap items-center gap-2">
+                                          <span className="font-mono text-xs font-bold tabular-nums text-stone-800 dark:text-[#fdfbf7]">
+                                            {buildTimeRange(entry.from_time, entry.to_time)}
+                                          </span>
+                                          <span
+                                            className="font-mono text-[8px] px-1.5 py-0.5 text-stone-700 dark:text-stone-300"
+                                            style={{ background: "#f5eed7", border: "1.5px solid #c8a96e" }}
+                                          >
+                                            ACTUAL
+                                          </span>
+                                          {/* Dynamic day/date badge computed from tripStartDate + day_number */}
+                                          <span className="font-mono text-[8px] px-1.5 py-0.5 text-stone-500 border border-stone-300 dark:border-stone-600 rounded bg-[#f5eed7]/50 dark:bg-[#362d28]/50">
+                                            Day {entry.day_number} · {(() => {
+                                              const d = computeDateForDay(tripStartDate, entry.day_number);
+                                              const dt = new Date(d + "T00:00:00");
+                                              return `${String(dt.getDate()).padStart(2,"0")}/${String(dt.getMonth()+1).padStart(2,"0")}/${dt.getFullYear()}`;
+                                            })()}
+                                          </span>
+                                        </div>
+                                        {/* Details text */}
+                                        <p className="font-mono text-sm leading-relaxed text-stone-800 dark:text-[#fdfbf7]">
+                                          {entry.details}
+                                        </p>
+                                      </div>
+
+                                      {/* Edit / Delete — hover-reveal */}
+                                      <div className="flex shrink-0 items-start gap-1 pt-0.5 opacity-100 transition-opacity duration-150 md:opacity-0 md:group-hover:opacity-100">
+                                        <button
+                                          onClick={() => setEditingEntry(entry)}
+                                          title="Edit entry"
+                                          className="game-btn flex h-7 w-7 items-center justify-center font-mono text-xs bg-[#f5eed7] text-stone-800 border-2 border-stone-800 dark:bg-[#362d28] dark:text-[#fdfbf7] dark:border-[#54463d]"
+                                        >
+                                          ✏
+                                        </button>
+                                        <button
+                                          onClick={() => handleDelete(entry.id)}
+                                          title="Delete entry"
+                                          className="game-btn flex h-7 w-7 items-center justify-center font-mono text-xs bg-red-50 text-red-700 border-2 border-red-300 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800"
+                                        >
+                                          🗑
+                                        </button>
+                                      </div>
+                                    </div>
+                                  )}
+                                </Draggable>
+                              ))
+                            )}
+                          </div>
+                        )}
+                        {provided.placeholder}
                       </div>
-                    ))}
-                  </div>
-                )}
+                    )}
+                  </Droppable>
 
-              </div>
-            );
-          })}
-        </div>
+                </div>
+              );
+            })}
+          </div>
+        </DragDropContext>
       )}
 
     </div>
   );
 }
-
-

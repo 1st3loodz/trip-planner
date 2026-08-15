@@ -108,7 +108,7 @@ export default function ItineraryTab({ trip, onAddActivity, onEditActivity, onDe
 
       {showActualLog && (
         <div className="mb-8 animate-in slide-in-from-top-2 fade-in duration-200">
-          <ActualLogTab tripId={trip.id} days={trip.days} />
+          <ActualLogTab tripId={trip.id} days={trip.days} tripStartDate={trip.startDate} />
         </div>
       )}
 
