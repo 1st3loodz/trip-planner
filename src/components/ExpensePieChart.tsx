@@ -43,8 +43,9 @@ export default function ExpensePieChart({ expenses, participants }: ExpensePieCh
     for (const p of participants) totals[p.id] = 0;
     for (const exp of expenses) {
       for (const split of (exp?.splits || [])) {
-        totals[split.participantId] =
-          (totals[split.participantId] ?? 0) + convertToBase(Number(split.amount) || 0, exp?.currency || baseCurrency, rates);
+        const isLegacy = exp?.foreignAmount === undefined && exp?.currency !== baseCurrency;
+        const base = isLegacy ? convertToBase(Number(split.amount) || 0, exp?.currency || baseCurrency, rates) : Number(split.amount);
+        totals[split.participantId] = (totals[split.participantId] ?? 0) + base;
       }
     }
     return totals;

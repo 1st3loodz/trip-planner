@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { Expense, ExpenseCategory, EXPENSE_CATEGORY_META } from "@/types/trip";
 import { useCurrency } from "@/contexts/CurrencyContext";
-import { convertToBase, formatBase } from "@/lib/currency";
+import { convertToBase, formatBase, getConvertedAmountTHB, getExchangeRate } from "@/lib/currency";
 
 // Category hex colors for the SVG segments (Cozy Theme)
 const CATEGORY_HEX: Record<ExpenseCategory, string> = {
@@ -51,14 +51,17 @@ export default function MemberCategoryChart({ memberId, memberName, expenses, cu
       
       if (exp?.isExcluded) {
         if (actualPaidById === memberId) {
-          const base = convertToBase(Number(exp?.amount) || 0, exp?.currency || baseCurrency, rates);
+          const base = getConvertedAmountTHB(exp);
           totals[cat] = (totals[cat] ?? 0) + base;
         }
         continue;
       }
       const split = (exp?.splits || []).find((s) => s.participantId === memberId);
       if (!split) continue;
-      const base = convertToBase(Number(split.amount) || 0, exp?.currency || baseCurrency, rates);
+      
+      const isLegacy = exp?.foreignAmount === undefined && exp?.currency !== baseCurrency;
+      const base = isLegacy ? convertToBase(Number(split.amount) || 0, exp?.currency || baseCurrency, rates) : Number(split.amount);
+      
       totals[cat] = (totals[cat] ?? 0) + base;
     }
     return totals;

@@ -6,7 +6,7 @@ import {
   EXPENSE_CATEGORY_META, CURRENCY_META, Currency,
 } from "@/types/trip";
 import { useCurrency } from "@/contexts/CurrencyContext";
-import { getExpenseEffectiveRate } from "@/lib/currency";
+import { getExchangeRate, getConvertedAmountTHB } from "@/lib/currency";
 import { convertToBase, formatBase } from "@/lib/currency";
 import { formatCurrency } from "@/lib/utils";
 import Avatar from "@/components/Avatar";
@@ -37,12 +37,10 @@ export default function IndividualSummary({ expenses, participants, customCatego
   const allGroups = useMemo<DayGroup[]>(() => {
     const map = new Map<string, LedgerEntry[]>();
     for (const exp of expenses) {
-      const effectiveRate = getExpenseEffectiveRate(exp);
+      const effectiveRate = getExchangeRate(exp);
       const isLegacy = exp.foreignAmount === undefined && exp.currency !== baseCurrency;
       
-      const totalBillTHB = (exp.currency !== baseCurrency && Number(exp.foreignAmount) > 0)
-        ? Number(exp.foreignAmount) * effectiveRate
-        : Number(exp.amount) || 0;
+      const totalBillTHB = getConvertedAmountTHB(exp);
         
       const actualPaidById = exp.paidById || (exp as any).paid_by || (exp as any).payer_id || (exp as any).created_by || (exp as any).createdBy;
       
@@ -276,10 +274,8 @@ export default function IndividualSummary({ expenses, participants, customCatego
                     const actualPaidById = expense.paidById || (expense as any).paid_by || (expense as any).payer_id || (expense as any).created_by || (expense as any).createdBy;
                     const isPayer  = actualPaidById === selectedId;
                     
-                    const effectiveRate = getExpenseEffectiveRate(expense);
-                    const totalBillTHB = (expense.currency !== baseCurrency && Number(expense.foreignAmount) > 0)
-                      ? Number(expense.foreignAmount) * effectiveRate
-                      : Number(expense.amount) || 0;
+                    const effectiveRate = getExchangeRate(expense);
+                    const totalBillTHB = getConvertedAmountTHB(expense);
                       
                     const owedBase = isPayer ? Math.max(0, totalBillTHB - shareBase) : 0;
                     

@@ -6,7 +6,7 @@ import {
   EXPENSE_CATEGORY_META, CURRENCY_META,
 } from "@/types/trip";
 import { formatCurrency } from "@/lib/utils";
-import { convertToBase, formatBase, getExpenseEffectiveRate } from "@/lib/currency";
+import { convertToBase, formatBase, getExchangeRate, getConvertedAmountTHB } from "@/lib/currency";
 import { ExpensePieChart } from "./ExpensePieChart";
 import { useCurrency } from "@/contexts/CurrencyContext";
 import { computeSettlementsInBase } from "@/lib/settlement";
@@ -68,10 +68,7 @@ export default function ExpensesTab({
   // Per-currency raw totals and their frozen base equivalents
   const rawTotals = expenses.reduce<Record<string, { total: number; baseTotal: number }>>((acc, e) => {
     if (!e.isExcluded) {
-      const effectiveRate = getExpenseEffectiveRate(e);
-      const totalBillTHB = (e.currency !== baseCurrency && Number(e.foreignAmount) > 0)
-        ? Number(e.foreignAmount) * effectiveRate
-        : Number(e.amount) || 0;
+      const totalBillTHB = getConvertedAmountTHB(e);
         
       if (!acc[e.currency]) acc[e.currency] = { total: 0, baseTotal: 0 };
       acc[e.currency].total += (e.currency !== baseCurrency && Number(e.foreignAmount) > 0) ? Number(e.foreignAmount) : (parseFloat(e.amount as any) || 0);
@@ -84,10 +81,7 @@ export default function ExpensesTab({
   const grandTotalBase = useMemo(
     () => expenses.reduce((sum, e) => {
       if (e.isExcluded) return sum;
-      const effectiveRate = getExpenseEffectiveRate(e);
-      const totalBillTHB = (e.currency !== baseCurrency && Number(e.foreignAmount) > 0)
-        ? Number(e.foreignAmount) * effectiveRate
-        : Number(e.amount) || 0;
+      const totalBillTHB = getConvertedAmountTHB(e);
       return sum + totalBillTHB;
     }, 0),
     [expenses, baseCurrency]
@@ -240,10 +234,7 @@ export default function ExpensesTab({
               {groupedExpenses.map((group) => {
                 const dayTotal = group.expenses.reduce((sum, e) => {
                   if (e.isExcluded) return sum;
-                  const effectiveRate = getExpenseEffectiveRate(e);
-                  const totalBillTHB = (e.currency !== baseCurrency && Number(e.foreignAmount) > 0)
-                    ? Number(e.foreignAmount) * effectiveRate
-                    : Number(e.amount) || 0;
+                  const totalBillTHB = getConvertedAmountTHB(e);
                   return sum + totalBillTHB;
                 }, 0);
                 const isExpanded = expandedDates[group.date] ?? false;

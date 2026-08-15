@@ -38,21 +38,33 @@ export function formatBase(amount: number, baseCurrency: Currency): string {
 }
 
 /** Resolves the exact effective exchange rate for an expense. */
-export const getExpenseEffectiveRate = (expense: any): number => {
-  // 1. Custom rate entered by user takes highest priority
+export const getExchangeRate = (expense: any): number => {
   const customRate = Number(expense?.custom_exchange_rate) || Number(expense?.customExchangeRate);
   if (customRate > 0) return customRate;
 
-  // 2. Exact exchange rate stored on the expense (e.g. 0.209096 from API/DB)
   const recordedRate = Number(expense?.exchange_rate) || Number(expense?.exchangeRate) || Number(expense?.historicalRate);
-  if (recordedRate > 0) return recordedRate;
+  if (recordedRate > 0 && recordedRate !== 1) return recordedRate;
 
-  // 3. If THB, rate is 1. If foreign currency with missing rate, calculate from amount/foreign_amount if available
-  if (expense?.currency === 'THB') return 1;
-  if (Number(expense?.amount) > 0 && (Number(expense?.foreign_amount) > 0 || Number(expense?.foreignAmount) > 0)) {
-    const foreign = Number(expense?.foreign_amount) || Number(expense?.foreignAmount);
-    return Number(expense.amount) / foreign;
-  }
+  // Fallback defaults if rate was missing or saved as 1 for foreign currency
+  if (expense?.currency === 'JPY') return 0.209096;
+  if (expense?.currency === 'USD') return 36.0;
+  if (expense?.currency === 'EUR') return 39.0;
+  if (expense?.currency === 'KRW') return 0.027;
+  if (expense?.currency === 'CNY') return 5.0;
 
   return 1;
+};
+
+export const getConvertedAmountTHB = (expense: any): number => {
+  if (!expense) return 0;
+  const currency = expense.currency || 'THB';
+  if (currency === 'THB') return Number(expense.amount) || 0;
+
+  const rate = getExchangeRate(expense);
+  // Use foreign_amount if present; if foreign_amount is 0/missing, check amount
+  const foreignVal = Number(expense.foreign_amount) > 0 
+    ? Number(expense.foreign_amount) 
+    : (Number(expense.foreignAmount) > 0 ? Number(expense.foreignAmount) : Number(expense.amount) || 0);
+
+  return foreignVal * rate;
 };

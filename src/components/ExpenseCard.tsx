@@ -2,7 +2,7 @@
 
 import { Expense, Participant, EXPENSE_CATEGORY_META, CURRENCY_META, Currency } from "@/types/trip";
 import { formatCurrency } from "@/lib/utils";
-import { DEFAULT_RATES, getExpenseEffectiveRate } from "@/lib/currency";
+import { DEFAULT_RATES, getExchangeRate, getConvertedAmountTHB } from "@/lib/currency";
 import Avatar from "@/components/Avatar";
 import { useCurrency } from "@/contexts/CurrencyContext";
 
@@ -42,10 +42,7 @@ export default function ExpenseCard({ expense, participants, onEdit, onDelete, c
           <div className="flex flex-col items-end gap-0.5">
             <span className={`font-mono text-base font-black tabular-nums text-stone-800 dark:text-[#fdfbf7] ${expense.isExcluded ? 'line-through opacity-70' : ''}`}>
               {(() => {
-                const effectiveRate = getExpenseEffectiveRate(expense);
-                const totalBillTHB = (expense.currency !== baseCurrency && Number(expense.foreignAmount) > 0)
-                  ? Number(expense.foreignAmount) * effectiveRate
-                  : Number(expense.amount) || 0;
+                const totalBillTHB = getConvertedAmountTHB(expense);
                 return formatCurrency(totalBillTHB, baseCurrency);
               })()}
             </span>
@@ -56,7 +53,7 @@ export default function ExpenseCard({ expense, participants, onEdit, onDelete, c
                   expense.currency
                 )} 
                 {(() => {
-                  const effectiveRate = getExpenseEffectiveRate(expense);
+                  const effectiveRate = getExchangeRate(expense);
                   return effectiveRate !== 1 ? ` (@ ${effectiveRate})` : "";
                 })()}
               </span>
