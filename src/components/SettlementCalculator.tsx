@@ -391,7 +391,7 @@ export default function SettlementCalculator({ settlements, participants, onEdit
                                   const expAmt    = inv.amountOwed ?? 0;
                                   const actualDate = inv.expense?.date || (inv.expense as any)?.expense_date || inv.expense?.createdAt || (inv.expense as any)?.created_at;
                                   const parsedDate = actualDate ? new Date(actualDate.includes('T') ? actualDate : actualDate + "T00:00:00") : null;
-                                  const dateLabel = parsedDate ? parsedDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "";
+                                  const dateLabel = parsedDate ? parsedDate.toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" }) : "";
 
                                   return (
                                     <div key={idx} className={`flex items-center gap-3 font-mono text-[11px] transition-all duration-300 ${isSubSettled ? "opacity-40 grayscale" : ""}`}>

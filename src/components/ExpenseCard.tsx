@@ -23,7 +23,7 @@ export default function ExpenseCard({ expense, participants, onEdit, onDelete, c
   const perPerson = expense.splits.length > 0 ? (parseFloat(expense.amount as any) || 0) / expense.splits.length : 0;
   const actualDate = expense.date || (expense as any).expense_date || expense.createdAt || (expense as any).created_at;
   const parsedDate = actualDate ? new Date(actualDate.includes('T') ? actualDate : actualDate + "T00:00:00") : null;
-  const dateLabel = parsedDate ? parsedDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "";
+  const dateLabel = parsedDate ? parsedDate.toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" }) : "";
 
   return (
     <div className={`group border-2 border-stone-400 p-4 transition-all duration-200 hover:border-stone-800 hover:shadow-[4px_4px_0_#292524] dark:border-[#54463d] dark:hover:border-stone-600 dark:hover:shadow-[4px_4px_0_#1e1815] ${expense.isExcluded ? 'bg-stone-200 opacity-70 grayscale-[20%] dark:bg-[#1e1815]' : 'bg-[#fdfbf7] dark:bg-[#28211d]'}`}>

@@ -243,7 +243,7 @@ export default function ExpensesTab({
                     >
                       <div className="flex items-center gap-2">
                         <span className="font-pixel text-xs uppercase tracking-wider text-stone-800 dark:text-[#fdfbf7]">
-                          {new Date(group.date + "T00:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
+                          {new Date(group.date + "T00:00:00").toLocaleDateString("en-GB", { weekday: "short", day: "2-digit", month: "2-digit", year: "numeric" })}
                         </span>
                         <span className="font-mono text-[10px] text-stone-500 dark:text-stone-400">
                           ({group.expenses.length} item{group.expenses.length !== 1 ? 's' : ''})
