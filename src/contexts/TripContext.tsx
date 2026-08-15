@@ -363,8 +363,29 @@ export function TripProvider({ children }: { children: React.ReactNode }) {
   }, [supabase]);
 
   const updateTrip = useCallback(async (id: string, partialTrip: Partial<Trip>) => {
+    let newTotalDays: number | null = null;
+    let updatedDaysJSON: any[] | null = null;
+
     setTrips((prev) =>
-      prev.map((trip) => (trip.id === id ? { ...trip, ...partialTrip } : trip))
+      prev.map((trip) => {
+        if (trip.id === id) {
+          const updatedTrip = { ...trip, ...partialTrip };
+          if (partialTrip.startDate || partialTrip.endDate) {
+            const sDate = new Date(updatedTrip.startDate + "T00:00:00");
+            const eDate = new Date(updatedTrip.endDate + "T00:00:00");
+            const msPerDay = 1000 * 60 * 60 * 24;
+            newTotalDays = Math.max(1, Math.round((eDate.getTime() - sDate.getTime()) / msPerDay) + 1);
+            
+            // Shrink the days array if trip duration was reduced
+            if (updatedTrip.days && updatedTrip.days.length > newTotalDays) {
+              updatedTrip.days = updatedTrip.days.slice(0, newTotalDays);
+              updatedDaysJSON = updatedTrip.days;
+            }
+          }
+          return updatedTrip;
+        }
+        return trip;
+      })
     );
     if (!userId) return;
 
@@ -374,6 +395,12 @@ export function TripProvider({ children }: { children: React.ReactNode }) {
     if ("travelType"       in dbPatch) { dbPatch.travel_type        = dbPatch.travelType;       delete dbPatch.travelType;       }
     if ("baseCurrency"     in dbPatch) { dbPatch.base_currency      = dbPatch.baseCurrency;     delete dbPatch.baseCurrency;     }
     if ("customCategories" in dbPatch) { dbPatch.custom_categories  = dbPatch.customCategories; delete dbPatch.customCategories; }
+    
+    // Inject sliced days into DB patch if dates were shrunk
+    if (updatedDaysJSON) {
+      dbPatch.days = updatedDaysJSON;
+    }
+    
     if ("days"             in dbPatch) { dbPatch.total_days = (dbPatch.days as any[]).length;   }
     
     delete dbPatch.participants;
@@ -382,6 +409,16 @@ export function TripProvider({ children }: { children: React.ReactNode }) {
     const { error } = await supabase.from("trips").update(dbPatch).eq("id", id);
     if (error) {
       console.error("[updateTrip] Failed:", error.message, error.details);
+    }
+    
+    // Defensive cleanup: if trip shrunk, delete orphaned actual_logs beyond newTotalDays
+    if (newTotalDays !== null) {
+      const { error: logsError } = await supabase
+        .from("actual_logs")
+        .delete()
+        .eq("trip_id", id)
+        .gt("day_number", newTotalDays);
+      if (logsError) console.error("[updateTrip] Failed cleaning orphaned logs:", logsError.message);
     }
   }, [userId, supabase]);
 

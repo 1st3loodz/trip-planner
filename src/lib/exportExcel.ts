@@ -55,8 +55,16 @@ export async function exportTripToExcel(trip: Trip, baseCurrency: Currency, rate
   const wsSettlement = XLSX.utils.json_to_sheet(settlementData);
   XLSX.utils.book_append_sheet(wb, wsSettlement, "Settlement");
 
+  // Calculate total duration in days safely based on trip.startDate and trip.endDate
+  const sDate = new Date(trip.startDate + "T00:00:00");
+  const eDate = new Date(trip.endDate + "T00:00:00");
+  const msPerDay = 1000 * 60 * 60 * 24;
+  const totalDays = Math.round((eDate.getTime() - sDate.getTime()) / msPerDay) + 1;
+
   // Sheet 3: Actual Plan
-  const actualPlanData = (actualLogs || []).map((log: any) => ({
+  const actualPlanData = (actualLogs || [])
+    .filter((log: any) => log.day_number <= totalDays)
+    .map((log: any) => ({
     "Day Number": log.day_number,
     "Date": formatDate(addDaysToISO(trip.startDate, log.day_number - 1)),
     "From Time": log.from_time || "",
@@ -68,7 +76,9 @@ export async function exportTripToExcel(trip: Trip, baseCurrency: Currency, rate
 
   // Sheet 4: Planned Itinerary
   const itineraryData: any[] = [];
-  (trip.days || []).forEach((day) => {
+  (trip.days || [])
+    .filter((day) => day.dayNumber <= totalDays)
+    .forEach((day) => {
     (day.activities || []).forEach((act) => {
       itineraryData.push({
         "Day Number": day.dayNumber,
