@@ -165,8 +165,9 @@ export default function ItineraryTab({ trip, onAddActivity, onEditActivity, onDe
       )}
 
       {visibleDays.length > 0 ? (
-        isFiltering ? (
-          // Plain list when a category filter is active (no DnD while filtering)
+        <DragDropContext onDragEnd={handleDragEnd}>
+          {isFiltering ? (
+            // Plain list when a category filter is active (no DnD while filtering)
           visibleDays.map((day, idx) => {
             try {
               if (!day) return null;
@@ -189,8 +190,7 @@ export default function ItineraryTab({ trip, onAddActivity, onEditActivity, onDe
             }
           })
         ) : (
-          <DragDropContext onDragEnd={handleDragEnd}>
-            <Droppable droppableId="days-list" type="day">
+          <Droppable droppableId="days-list" type="day">
               {(provided) => (
                 <div
                   ref={provided.innerRef}
@@ -242,8 +242,8 @@ export default function ItineraryTab({ trip, onAddActivity, onEditActivity, onDe
                 </div>
               )}
             </Droppable>
-          </DragDropContext>
-        )
+          )}
+        </DragDropContext>
       ) : (
         <div className="py-16 text-center border-2 border-dashed border-stone-400 bg-stone-200/50 dark:border-stone-600 dark:bg-stone-800/30">
           <div className="mb-2 text-4xl">🔍</div>
