@@ -7,6 +7,7 @@ import { ACTIVITY_CATEGORY_META, addDaysToISO } from "@/lib/utils";
 import DayCard from "@/components/DayCard";
 import AddActivityModal from "@/components/AddActivityModal";
 import ActualLogTab from "@/components/ActualLogTab";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 interface ItineraryTabProps {
   trip: Trip;
@@ -28,17 +29,33 @@ export default function ItineraryTab({ trip, onAddActivity, onEditActivity, onDe
   const [modalState,    setModalState]    = useState<ModalState>(null);
   const [showActualLog, setShowActualLog] = useState<boolean>(false);
 
-  const allActivities = trip.days.flatMap((d) => d.activities);
+  const safeDays = Array.isArray(trip?.days) ? trip.days : [];
+  const allActivities = safeDays.flatMap((d) => Array.isArray(d?.activities) ? d.activities : []);
   const counts: Partial<Record<Filter, number>> = { all: allActivities.length };
-  allActivities.forEach((a) => { counts[a.category] = (counts[a.category] ?? 0) + 1; });
+  allActivities.forEach((a) => { 
+    if (!a) return;
+    const cat = a.category || "other";
+    counts[cat as ActivityCategory] = (counts[cat as ActivityCategory] ?? 0) + 1; 
+  });
+  
   const presentCats = (Object.keys(ACTIVITY_CATEGORY_META) as ActivityCategory[]).filter((c) => counts[c]);
-  const presentCustomCats = customCategories.filter((c) => counts[c.id]);
+  const presentCustomCats = Array.isArray(customCategories) ? customCategories.filter((c) => c && counts[c.id]) : [];
 
   // When filtering we show a flat filtered view without drag-to-reorder
   const isFiltering = filter !== "all";
 
-  const visibleDays = trip.days
-    .map((day) => ({ ...day, activities: filter === "all" ? day.activities : day.activities.filter((a) => a.category === filter) }))
+  const visibleDays = safeDays
+    .map((day) => {
+      const dayActivities = Array.isArray(day?.activities) ? day.activities : [];
+      return { 
+        ...day, 
+        activities: filter === "all" ? dayActivities : dayActivities.filter((a) => {
+          if (!a) return false;
+          const itemType = (a.category || '').toLowerCase();
+          return itemType === filter.toLowerCase();
+        }) 
+      };
+    })
     .filter((day) => day.activities.length > 0 || filter === "all");
 
   function handleSave(dayNumber: number, activity: ActivityItem) {
@@ -162,37 +179,39 @@ export default function ItineraryTab({ trip, onAddActivity, onEditActivity, onDe
                   ref={provided.innerRef}
                   {...provided.droppableProps}
                 >
-                  {visibleDays.map((day, idx) => (
-                    <Draggable key={String(day.dayNumber)} draggableId={String(day.dayNumber)} index={idx}>
-                      {(dragProvided, dragSnapshot) => (
-                        <div
-                          ref={dragProvided.innerRef}
-                          {...dragProvided.draggableProps}
-                          style={{
-                            ...dragProvided.draggableProps.style,
-                            opacity: dragSnapshot.isDragging ? 0.85 : 1,
-                            transform: dragSnapshot.isDragging
-                              ? `${dragProvided.draggableProps.style?.transform ?? ""} rotate(1.5deg)`
-                              : dragProvided.draggableProps.style?.transform,
-                            boxShadow: dragSnapshot.isDragging
-                              ? "6px 6px 0 #292524"
-                              : undefined,
-                            zIndex: dragSnapshot.isDragging ? 50 : undefined,
-                          }}
-                        >
-                          <DayCard
-                            day={day}
-                            destination={trip.destination}
-                            tripStartDate={trip.startDate}
-                            defaultOpen={false}
-                            customCategories={customCategories}
-                            dragHandleProps={dragProvided.dragHandleProps}
-                            onEditActivity={(dayNumber, activity) => setModalState({ mode: "edit", activity, dayNumber })}
-                            onDeleteActivity={onDeleteActivity}
-                          />
-                        </div>
-                      )}
-                    </Draggable>
+                  {visibleDays.map((day, index) => (
+                    <ErrorBoundary key={day.id || day.dayNumber}>
+                      <Draggable draggableId={String(day.dayNumber)} index={index} isDragDisabled={isFiltering}>
+                        {(dragProvided, dragSnapshot) => (
+                          <div
+                            ref={dragProvided.innerRef}
+                            {...dragProvided.draggableProps}
+                            style={{
+                              ...dragProvided.draggableProps.style,
+                              opacity: dragSnapshot.isDragging ? 0.85 : 1,
+                              transform: dragSnapshot.isDragging
+                                ? `${dragProvided.draggableProps.style?.transform ?? ""} rotate(1.5deg)`
+                                : dragProvided.draggableProps.style?.transform,
+                              boxShadow: dragSnapshot.isDragging
+                                ? "6px 6px 0 #292524"
+                                : undefined,
+                              zIndex: dragSnapshot.isDragging ? 50 : undefined,
+                            }}
+                          >
+                            <DayCard
+                              day={day}
+                              destination={trip.destination}
+                              tripStartDate={trip.startDate}
+                              defaultOpen={false}
+                              customCategories={customCategories}
+                              dragHandleProps={isFiltering ? null : dragProvided.dragHandleProps}
+                              onEditActivity={(dayNumber, activity) => setModalState({ mode: "edit", activity, dayNumber })}
+                              onDeleteActivity={onDeleteActivity}
+                            />
+                          </div>
+                        )}
+                      </Draggable>
+                    </ErrorBoundary>
                   ))}
                   {provided.placeholder}
                 </div>

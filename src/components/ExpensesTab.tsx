@@ -8,6 +8,7 @@ import {
 import { formatCurrency } from "@/lib/utils";
 import { convertToBase, formatBase, getExchangeRate, getConvertedAmountTHB } from "@/lib/currency";
 import { ExpensePieChart } from "./ExpensePieChart";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { useCurrency } from "@/contexts/CurrencyContext";
 import { computeSettlementsInBase } from "@/lib/settlement";
 import ExpenseCard          from "@/components/ExpenseCard";
@@ -88,14 +89,23 @@ export default function ExpensesTab({
   );
 
   const filtered = expenses
-    .filter((e) => filterCat === "all" || e.category === filterCat)
-    .filter((e) => filterCur === "all" || e.currency === filterCur)
+    .filter((e) => {
+      if (!e) return false;
+      if (filterCat === "all") return true;
+      const cat = (e.category || '').toLowerCase();
+      return cat === filterCat.toLowerCase();
+    })
+    .filter((e) => {
+      if (!e) return false;
+      if (filterCur === "all") return true;
+      return e.currency === filterCur;
+    })
     .sort((a, b) => {
       switch (sortKey) {
-        case "date-asc":    return a.date.localeCompare(b.date) || a.createdAt.localeCompare(b.createdAt);
-        case "date-desc":   return b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt);
-        case "amount-high": return b.amount - a.amount;
-        case "amount-low":  return a.amount - b.amount;
+        case "date-asc":    return (a?.date || "").localeCompare(b?.date || "") || (a?.createdAt || "").localeCompare(b?.createdAt || "");
+        case "date-desc":   return (b?.date || "").localeCompare(a?.date || "") || (b?.createdAt || "").localeCompare(a?.createdAt || "");
+        case "amount-high": return (b?.amount || 0) - (a?.amount || 0);
+        case "amount-low":  return (a?.amount || 0) - (b?.amount || 0);
         default:            return 0;
       }
     });
@@ -240,38 +250,42 @@ export default function ExpensesTab({
                 const isExpanded = expandedDates[group.date] ?? false;
 
                 return (
-                  <div key={group.date} className="border-4 border-stone-800 bg-[#fdfbf7] dark:border-[#54463d] dark:bg-[#28211d] shadow-[4px_4px_0_#292524] dark:shadow-[4px_4px_0_#1e1815] transition-all">
-                    <button 
-                      onClick={() => toggleDate(group.date)}
-                      className={`w-full flex items-center justify-between bg-[#e8dcc4] dark:bg-[#362d28] px-4 py-3 hover:bg-[#d8ccb4] dark:hover:bg-[#463d38] transition-colors ${isExpanded ? "border-b-4 border-stone-800 dark:border-[#54463d]" : ""}`}
-                    >
-                      <div className="flex items-center gap-2">
-                        <span className="font-pixel text-xs uppercase tracking-wider text-stone-800 dark:text-[#fdfbf7]">
-                          {new Date(group.date + "T00:00:00").toLocaleDateString("en-GB", { weekday: "short", day: "2-digit", month: "2-digit", year: "numeric" })}
-                        </span>
-                        <span className="font-mono text-[10px] text-stone-500 dark:text-stone-400">
-                          ({group.expenses.length} item{group.expenses.length !== 1 ? 's' : ''})
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <span className="font-mono text-sm font-black tabular-nums text-stone-800 dark:text-[#fdfbf7]">
-                          {formatBase(dayTotal, baseCurrency)}
-                        </span>
-                        <span className="font-mono text-xs text-stone-500 dark:text-stone-400 transition-transform duration-200" style={{ transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
-                      </div>
-                    </button>
-                    
-                    <div 
-                      className="grid transition-[grid-template-rows] duration-300 ease-in-out" 
-                      style={{ gridTemplateRows: isExpanded ? "1fr" : "0fr" }}
-                    >
-                      <div className="overflow-hidden">
-                        <div className="p-3 space-y-3 bg-[#fdfbf7] dark:bg-[#28211d]">
-                          {group.expenses.map((exp) => (
-                            <ExpenseCard key={exp.id} expense={exp} participants={participants} customCategories={customCategories}
-                              onEdit={(e) => setModalState({ mode: "edit", expense: e })}
-                              onDelete={(id) => setExpenseToDelete(id)} />
-                          ))}
+                  <ErrorBoundary key={group.date}>
+                    <div className="border-4 border-stone-800 bg-[#fdfbf7] dark:border-[#54463d] dark:bg-[#28211d] shadow-[4px_4px_0_#292524] dark:shadow-[4px_4px_0_#1e1815] transition-all">
+                      <button 
+                        onClick={() => toggleDate(group.date)}
+                        className={`w-full flex items-center justify-between bg-[#e8dcc4] dark:bg-[#362d28] px-4 py-3 hover:bg-[#d8ccb4] dark:hover:bg-[#463d38] transition-colors ${isExpanded ? "border-b-4 border-stone-800 dark:border-[#54463d]" : ""}`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="font-pixel text-xs uppercase tracking-wider text-stone-800 dark:text-[#fdfbf7]">
+                            {new Date(group.date + "T00:00:00").toLocaleDateString("en-GB", { weekday: "short", day: "2-digit", month: "2-digit", year: "numeric" })}
+                          </span>
+                          <span className="font-mono text-[10px] text-stone-500 dark:text-stone-400">
+                            ({group.expenses.length} item{group.expenses.length !== 1 ? 's' : ''})
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className="font-mono text-sm font-black tabular-nums text-stone-800 dark:text-[#fdfbf7]">
+                            {formatBase(dayTotal, baseCurrency)}
+                          </span>
+                          <span className="font-mono text-xs text-stone-500 dark:text-stone-400 transition-transform duration-200" style={{ transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
+                        </div>
+                      </button>
+                      
+                      <div 
+                        className="grid transition-[grid-template-rows] duration-300 ease-in-out" 
+                        style={{ gridTemplateRows: isExpanded ? "1fr" : "0fr" }}
+                      >
+                        <div className="overflow-hidden">
+                          <div className="p-3 space-y-3 bg-[#fdfbf7] dark:bg-[#28211d]">
+                            {group.expenses.map((exp) => (
+                              <ErrorBoundary key={exp.id}>
+                                <ExpenseCard expense={exp} participants={participants} customCategories={customCategories}
+                                  onEdit={(e) => setModalState({ mode: "edit", expense: e })}
+                                  onDelete={(id) => setExpenseToDelete(id)} />
+                              </ErrorBoundary>
+                            ))}
+                          </div>
                         </div>
                       </div>
                     </div>

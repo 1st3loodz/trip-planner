@@ -45,20 +45,31 @@ function computeDateForDay(tripStartDate: string, dayNum: number): string {
 
 function buildDayLabel(dayNum: number, tripStartDate: string): string {
   const isoDate = computeDateForDay(tripStartDate, dayNum);
-  const dt = new Date(isoDate + "T00:00:00");
-  const dd   = String(dt.getDate()).padStart(2, "0");
-  const mm   = String(dt.getMonth() + 1).padStart(2, "0");
-  const yyyy = dt.getFullYear();
-  return `Day ${dayNum}  ·  ${dd}/${mm}/${yyyy}`;
+  try {
+    const dt = new Date(isoDate + "T00:00:00");
+    if (isNaN(dt.getTime())) return `Day ${dayNum}  ·  -`;
+    const dd   = String(dt.getDate()).padStart(2, "0");
+    const mm   = String(dt.getMonth() + 1).padStart(2, "0");
+    const yyyy = dt.getFullYear();
+    return `Day ${dayNum}  ·  ${dd}/${mm}/${yyyy}`;
+  } catch {
+    return `Day ${dayNum}  ·  -`;
+  }
 }
 
 function buildDisplayDate(isoDate: string): string {
-  return new Date(isoDate + "T00:00:00").toLocaleDateString("en-GB", {
-    weekday: "long",
-    day:     "2-digit",
-    month:   "long",
-    year:    "numeric",
-  });
+  try {
+    const dt = new Date(isoDate + "T00:00:00");
+    if (isNaN(dt.getTime())) return "-";
+    return dt.toLocaleDateString("en-GB", {
+      weekday: "long",
+      day:     "2-digit",
+      month:   "long",
+      year:    "numeric",
+    });
+  } catch {
+    return "-";
+  }
 }
 
 function buildTimeRange(from: string | null, to: string | null): string {

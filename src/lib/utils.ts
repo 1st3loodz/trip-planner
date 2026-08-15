@@ -31,7 +31,11 @@ export function formatCurrency(amount: number, currency: string): string {
  * This avoids that by constructing the date in local time directly.
  */
 export function parseISOLocal(isoDate: string): Date {
-  const [y, m, d] = isoDate.split("-").map(Number);
+  if (!isoDate || typeof isoDate !== 'string') return new Date(NaN);
+  const parts = isoDate.split("-");
+  if (parts.length < 3) return new Date(NaN);
+  const [y, m, d] = parts.map(Number);
+  if (isNaN(y) || isNaN(m) || isNaN(d)) return new Date(NaN);
   return new Date(y, m - 1, d); // month is 0-indexed; always local time
 }
 
@@ -40,25 +44,39 @@ export function parseISOLocal(isoDate: string): Date {
  * Uses local-time math to avoid UTC off-by-one errors.
  */
 export function addDaysToISO(isoDate: string, days: number): string {
-  const d = parseISOLocal(isoDate);
-  d.setDate(d.getDate() + days);
-  const yy = d.getFullYear();
-  const mm  = String(d.getMonth() + 1).padStart(2, "0");
-  const dd  = String(d.getDate()).padStart(2, "0");
-  return `${yy}-${mm}-${dd}`;
+  try {
+    const d = parseISOLocal(isoDate);
+    if (isNaN(d.getTime())) return isoDate || "";
+    d.setDate(d.getDate() + days);
+    const yy = d.getFullYear();
+    const mm  = String(d.getMonth() + 1).padStart(2, "0");
+    const dd  = String(d.getDate()).padStart(2, "0");
+    return `${yy}-${mm}-${dd}`;
+  } catch {
+    return isoDate || "";
+  }
 }
 
 /**
  * Format an ISO date string as DD/MM/YYYY using local-time parsing.
  * Avoids the UTC-shift bug in `new Date("YYYY-MM-DD").toLocaleDateString()`.
  */
-export function formatDate(isoDate: string): string {
+export function formatDate(isoDate: string | null | undefined): string {
   if (!isoDate) return "—";
-  const d = parseISOLocal(isoDate);
-  const dd  = String(d.getDate()).padStart(2, "0");
-  const mm  = String(d.getMonth() + 1).padStart(2, "0");
-  const yyyy = d.getFullYear();
-  return `${dd}/${mm}/${yyyy}`;
+  try {
+    const d = parseISOLocal(isoDate);
+    if (isNaN(d.getTime())) {
+      const fallback = new Date(isoDate);
+      if (isNaN(fallback.getTime())) return "—";
+      return `${String(fallback.getDate()).padStart(2, "0")}/${String(fallback.getMonth() + 1).padStart(2, "0")}/${fallback.getFullYear()}`;
+    }
+    const dd  = String(d.getDate()).padStart(2, "0");
+    const mm  = String(d.getMonth() + 1).padStart(2, "0");
+    const yyyy = d.getFullYear();
+    return `${dd}/${mm}/${yyyy}`;
+  } catch {
+    return "—";
+  }
 }
 
 export function getInitials(name: string): string {
