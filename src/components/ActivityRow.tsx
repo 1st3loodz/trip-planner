@@ -27,12 +27,6 @@ const COZY_CATEGORY_STYLE: Record<ActivityCategory, { bg: string; border: string
   shopping:    { bg: "#fce7f3", border: "#f9a8d4", text: "#9d174d" }, // soft blush
 };
 
-const renderSafeText = (val: any): string => {
-  if (val === null || val === undefined) return '';
-  if (typeof val === 'object') return val.name || val.title || JSON.stringify(val);
-  return String(val);
-};
-
 export default function ActivityRow({ activity, destination, isLast, onEdit, onDelete, dayNumber, tripStartDate, customCategories = [], dragHandleProps }: ActivityRowProps) {
   const safeCategories = Array.isArray(customCategories) ? customCategories : [];
   const customCat = safeCategories.find((c) => c && c.id === activity?.category);
@@ -92,8 +86,8 @@ export default function ActivityRow({ activity, destination, isLast, onEdit, onD
           {/* Time — earthy monospace */}
           <span className="font-mono text-xs font-semibold tabular-nums text-stone-800 dark:text-[#fdfbf7]">
             {activity?.endTime
-              ? `${renderSafeText(activity?.time || '')} – ${renderSafeText(activity.endTime)}`
-              : renderSafeText(activity?.time || 'No Time')}
+              ? `${typeof activity?.time === 'string' ? activity.time : String(activity?.time || '')} – ${typeof activity?.endTime === 'string' ? activity.endTime : String(activity?.endTime || '')}`
+              : (typeof activity?.time === 'string' ? activity.time : String(activity?.time || 'No Time'))}
           </span>
           {/* Category badge — muted pastel flat pill */}
           <span
@@ -103,7 +97,7 @@ export default function ActivityRow({ activity, destination, isLast, onEdit, onD
               border: `1.5px solid ${cozyStyle.border}`,
             }}
           >
-            {renderSafeText(meta.label)}
+            {typeof meta.label === 'string' ? meta.label : String(meta.label || '')}
           </span>
           {/* Day/Date badge */}
           <span className="font-mono text-[9px] px-2 py-0.5 text-stone-500 border border-stone-300 dark:border-stone-600 rounded bg-[#f5eed7]/50 dark:bg-[#362d28]/50">
@@ -112,10 +106,10 @@ export default function ActivityRow({ activity, destination, isLast, onEdit, onD
         </div>
 
         <h3 className="mb-1 font-mono text-sm font-semibold leading-snug text-stone-800 dark:text-[#fdfbf7]">
-          {renderSafeText(activity?.title || 'Untitled')}
+          {typeof activity?.title === 'string' ? activity.title : String((activity?.title as any)?.name || activity?.title || 'Untitled')}
         </h3>
         {activity?.description && (
-          <p className="mb-1.5 whitespace-pre-line font-mono text-xs leading-relaxed text-stone-600 dark:text-[#f5ebd5]">{renderSafeText(activity.description)}</p>
+          <p className="mb-1.5 whitespace-pre-line font-mono text-xs leading-relaxed text-stone-600 dark:text-[#f5ebd5]">{typeof activity?.description === 'string' ? activity.description : String((activity?.description as any)?.name || activity?.description || '')}</p>
         )}
         {/* ── Candidate Locations list ─────────────────────────────────── */}
         {(() => {
@@ -144,7 +138,7 @@ export default function ActivityRow({ activity, destination, isLast, onEdit, onD
                     <span className="mt-px text-[10px] shrink-0">📍</span>
                     <div className="min-w-0">
                       <span className="font-mono text-[10px] leading-tight text-stone-600 dark:text-[#f5ebd5] break-words">
-                        {renderSafeText(loc?.name)}
+                        {typeof loc?.name === 'string' ? loc.name : String((loc as any)?.name?.name || loc?.name || '')}
                       </span>
                       <div className="mt-1 flex flex-wrap gap-1.5">
                         <a
@@ -179,7 +173,7 @@ export default function ActivityRow({ activity, destination, isLast, onEdit, onD
             style={{ background: "#ede9fe", border: "1.5px solid #c4b5fd", color: "#5b21b6" }}
           >
             <span>🚌</span>
-            <span className="text-stone-800">{renderSafeText(activity.transportationNote)}</span>
+            <span className="text-stone-800">{typeof activity.transportationNote === 'string' ? activity.transportationNote : String((activity.transportationNote as any)?.name || activity.transportationNote || '')}</span>
           </div>
         )}
       </div>

@@ -44,16 +44,24 @@ export default function ItineraryTab({ trip, onAddActivity, onEditActivity, onDe
   // When filtering we show a flat filtered view without drag-to-reorder
   const isFiltering = filter !== "all";
 
+  const getFilteredJourneyItems = (items: any[], activeTopic: string) => {
+    if (!Array.isArray(items)) return [];
+    return items.filter((item) => {
+      if (!item || typeof item !== 'object') return false;
+      if (!activeTopic || activeTopic.toLowerCase() === 'all') return true;
+
+      const topicVal = String(item?.topic || item?.category || item?.type || '').toLowerCase();
+      const target = activeTopic.toLowerCase();
+      return topicVal.includes(target) || target.includes(topicVal);
+    });
+  };
+
   const visibleDays = safeDays
     .map((day) => {
       const dayActivities = Array.isArray(day?.activities) ? day.activities : [];
       return { 
         ...day, 
-        activities: filter === "all" ? dayActivities : dayActivities.filter((a) => {
-          if (!a) return false;
-          const topic = (a?.topic || a?.category || a?.type || '').toLowerCase();
-          return topic === filter.toLowerCase();
-        }) 
+        activities: getFilteredJourneyItems(dayActivities, filter)
       };
     })
     .filter((day) => day.activities.length > 0 || filter === "all");
@@ -223,7 +231,7 @@ export default function ItineraryTab({ trip, onAddActivity, onEditActivity, onDe
       ) : (
         <div className="py-16 text-center border-2 border-dashed border-stone-400 bg-stone-200/50 dark:border-stone-600 dark:bg-stone-800/30">
           <div className="mb-2 text-4xl">🔍</div>
-          <p className="font-mono text-xs text-stone-600 dark:text-[#f5ebd5]">No entries match this filter.</p>
+          <p className="font-mono text-xs text-stone-600 dark:text-[#f5ebd5]">No activities or records found for this topic.</p>
         </div>
       )}
 
