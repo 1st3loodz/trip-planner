@@ -389,6 +389,9 @@ export default function SettlementCalculator({ settlements, participants, onEdit
                                   const debtorName = debtor?.name || "Trip Member";
                                   const expDesc   = inv.expense?.description || "Expense";
                                   const expAmt    = inv.amountOwed ?? 0;
+                                  const actualDate = inv.expense?.date || (inv.expense as any)?.expense_date || inv.expense?.createdAt || (inv.expense as any)?.created_at;
+                                  const parsedDate = actualDate ? new Date(actualDate.includes('T') ? actualDate : actualDate + "T00:00:00") : null;
+                                  const dateLabel = parsedDate ? parsedDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "";
 
                                   return (
                                     <div key={idx} className={`flex items-center gap-3 font-mono text-[11px] transition-all duration-300 ${isSubSettled ? "opacity-40 grayscale" : ""}`}>
@@ -415,7 +418,7 @@ export default function SettlementCalculator({ settlements, participants, onEdit
                                       <span className="shrink-0 text-sm">{cat.emoji}</span>
                                       <div className="flex-1 min-w-0 flex flex-col">
                                         <span className={`truncate font-semibold transition-all duration-300 ${isSubSettled ? "line-through text-stone-500 dark:text-stone-600" : "text-stone-700 dark:text-[#fdfbf7]"}`}>
-                                          {expDesc}
+                                          {expDesc} {dateLabel && <span className="font-mono text-[9px] font-normal text-stone-500 dark:text-stone-400 ml-1">({dateLabel})</span>}
                                         </span>
                                         <span className="text-[9px] text-stone-500 dark:text-stone-400">
                                           {inv.isCredit
