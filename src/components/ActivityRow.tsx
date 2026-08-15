@@ -2,6 +2,7 @@
 
 import { ActivityItem, ActivityCategory } from "@/types/trip";
 import { ACTIVITY_CATEGORY_META } from "@/lib/utils";
+import { DraggableProvidedDragHandleProps } from "@hello-pangea/dnd";
 
 interface ActivityRowProps {
   activity: ActivityItem;
@@ -10,6 +11,7 @@ interface ActivityRowProps {
   onEdit: (activity: ActivityItem) => void;
   onDelete: (id: string) => void;
   customCategories?: { id: string; label: string; emoji: string }[];
+  dragHandleProps?: DraggableProvidedDragHandleProps | null;
 }
 
 // Muted pastel flat-art category color fills (bg/text) — earthy, no neon
@@ -23,7 +25,7 @@ const COZY_CATEGORY_STYLE: Record<ActivityCategory, { bg: string; border: string
   shopping:    { bg: "#fce7f3", border: "#f9a8d4", text: "#9d174d" }, // soft blush
 };
 
-export default function ActivityRow({ activity, destination, isLast, onEdit, onDelete, customCategories = [] }: ActivityRowProps) {
+export default function ActivityRow({ activity, destination, isLast, onEdit, onDelete, customCategories = [], dragHandleProps }: ActivityRowProps) {
   const customCat = customCategories.find((c) => c.id === activity.category);
   const meta      = ACTIVITY_CATEGORY_META[activity.category] || { label: customCat?.label || activity.category, emoji: customCat?.emoji || "✨" };
   const cozyStyle = COZY_CATEGORY_STYLE[activity.category] || { bg: "#f3f4f6", border: "#d1d5db", text: "#374151" }; // neutral gray fallback for custom
@@ -32,7 +34,25 @@ export default function ActivityRow({ activity, destination, isLast, onEdit, onD
   const showAmap = ["china", "cn", "จีน", "beijing", "shanghai", "guangzhou", "shenzhen", "chengdu", "chongqing", "mainland"].some(str => destLower.includes(str));
 
   return (
-    <div className="group relative flex gap-4 py-4">
+    <div className="group relative flex gap-3 py-4 bg-[#fdfbf7] dark:bg-[#28211d] hover:bg-[#f5eed7] dark:hover:bg-[#2d2620] px-2 -mx-2 rounded transition-colors duration-100 items-start">
+      {/* Drag handle */}
+      {dragHandleProps && (
+        <div
+          {...dragHandleProps}
+          className="mt-1 flex shrink-0 items-center justify-center w-6 h-7 cursor-grab active:cursor-grabbing text-stone-300 hover:text-stone-500 dark:text-stone-600 dark:hover:text-stone-400 touch-none select-none"
+          title="Drag to reorder activity"
+        >
+          <svg width="12" height="20" viewBox="0 0 12 20" fill="currentColor">
+            <circle cx="4" cy="4" r="1.5" />
+            <circle cx="8" cy="4" r="1.5" />
+            <circle cx="4" cy="10" r="1.5" />
+            <circle cx="8" cy="10" r="1.5" />
+            <circle cx="4" cy="16" r="1.5" />
+            <circle cx="8" cy="16" r="1.5" />
+          </svg>
+        </div>
+      )}
+
       {/* Timeline node */}
       <div className="relative flex shrink-0 flex-col items-center" style={{ width: 40 }}>
         {/* Icon circle — muted pastel with monoline border */}

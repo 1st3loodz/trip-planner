@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { DraggableProvidedDragHandleProps } from "@hello-pangea/dnd";
+import { DraggableProvidedDragHandleProps, Droppable, Draggable } from "@hello-pangea/dnd";
 import { DayPlan, ActivityItem } from "@/types/trip";
 import { formatDate } from "@/lib/utils";
 import ActivityRow from "@/components/ActivityRow";
@@ -79,19 +79,47 @@ export default function DayCard({ day, destination, defaultOpen = true, dragHand
       {open && (
         <div className="mt-0 px-5 py-4 bg-[#f5eed7] dark:bg-[#28211d] border-2 border-t-0 border-stone-800 dark:border-[#54463d]">
           {day.activities.length === 0 ? (
-            <p className="py-4 text-center font-mono text-xs text-amber-700 dark:text-amber-300">No entries yet.</p>
+            <Droppable droppableId={String(day.dayNumber)} type="activity">
+              {(provided) => (
+                <div ref={provided.innerRef} {...provided.droppableProps} className="min-h-[60px]">
+                  <p className="py-4 text-center font-mono text-xs text-amber-700 dark:text-amber-300">No entries yet.</p>
+                  {provided.placeholder}
+                </div>
+              )}
+            </Droppable>
           ) : (
-            day.activities.map((act, idx) => (
-              <ActivityRow
-                key={act.id}
-                activity={act}
-                destination={destination}
-                isLast={idx === day.activities.length - 1}
-                customCategories={customCategories}
-                onEdit={(a) => onEditActivity(day.dayNumber, a)}
-                onDelete={(id) => onDeleteActivity(day.dayNumber, id)}
-              />
-            ))
+            <Droppable droppableId={String(day.dayNumber)} type="activity">
+              {(provided) => (
+                <div ref={provided.innerRef} {...provided.droppableProps}>
+                  {day.activities.map((act, idx) => (
+                    <Draggable key={act.id} draggableId={act.id} index={idx}>
+                      {(dragProvided, dragSnapshot) => (
+                        <div
+                          ref={dragProvided.innerRef}
+                          {...dragProvided.draggableProps}
+                          style={{
+                            ...dragProvided.draggableProps.style,
+                            opacity: dragSnapshot.isDragging ? 0.8 : 1,
+                            zIndex: dragSnapshot.isDragging ? 100 : undefined,
+                          }}
+                        >
+                          <ActivityRow
+                            activity={act}
+                            destination={destination}
+                            isLast={idx === day.activities.length - 1 && !dragSnapshot.isDragging}
+                            customCategories={customCategories}
+                            onEdit={(a) => onEditActivity(day.dayNumber, a)}
+                            onDelete={(id) => onDeleteActivity(day.dayNumber, id)}
+                            dragHandleProps={dragProvided.dragHandleProps}
+                          />
+                        </div>
+                      )}
+                    </Draggable>
+                  ))}
+                  {provided.placeholder}
+                </div>
+              )}
+            </Droppable>
           )}
         </div>
       )}

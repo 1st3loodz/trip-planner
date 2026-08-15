@@ -14,6 +14,7 @@ interface ItineraryTabProps {
   onEditActivity:   (dayNumber: number, activity: ActivityItem) => Promise<void> | void;
   onDeleteActivity: (dayNumber: number, activityId: string) => void;
   onReorderDays:    (reorderedDays: DayPlan[]) => Promise<void> | void;
+  onUpdateDays?:    (days: DayPlan[]) => void;
   customCategories: { id: string; label: string; emoji: string }[];
   onAddCustomCategory: (cat: { id: string; label: string; emoji: string }) => void;
   setRefreshToggle?: React.Dispatch<React.SetStateAction<number>>;
@@ -22,7 +23,7 @@ interface ItineraryTabProps {
 type Filter = ActivityCategory | "all";
 type ModalState = null | { mode: "add" } | { mode: "edit"; activity: ActivityItem; dayNumber: number };
 
-export default function ItineraryTab({ trip, onAddActivity, onEditActivity, onDeleteActivity, onReorderDays, customCategories, onAddCustomCategory, setRefreshToggle }: ItineraryTabProps) {
+export default function ItineraryTab({ trip, onAddActivity, onEditActivity, onDeleteActivity, onReorderDays, onUpdateDays, customCategories, onAddCustomCategory, setRefreshToggle }: ItineraryTabProps) {
   const [filter,        setFilter]        = useState<Filter>("all");
   const [modalState,    setModalState]    = useState<ModalState>(null);
   const [showActualLog, setShowActualLog] = useState<boolean>(false);
@@ -47,16 +48,35 @@ export default function ItineraryTab({ trip, onAddActivity, onEditActivity, onDe
 
   function handleDragEnd(result: DropResult) {
     if (!result.destination) return;
-    const { source, destination } = result;
-    if (source.index === destination.index) return;
+    const { source, destination, type } = result;
+    if (source.index === destination.index && source.droppableId === destination.droppableId) return;
 
-    // Reorder a shallow copy of the days array
-    const reordered = Array.from(trip.days);
-    const [moved] = reordered.splice(source.index, 1);
-    reordered.splice(destination.index, 0, moved);
+    if (type === "day") {
+      // Reorder a shallow copy of the days array
+      const reordered = Array.from(trip.days);
+      const [moved] = reordered.splice(source.index, 1);
+      reordered.splice(destination.index, 0, moved);
+      onReorderDays(reordered);
+    } else if (type === "activity") {
+      const sourceDayNum = parseInt(source.droppableId, 10);
+      const destDayNum = parseInt(destination.droppableId, 10);
 
-    // Persist new order — caller will renumber dayNumber fields
-    onReorderDays(reordered);
+      const sourceDayIdx = trip.days.findIndex(d => d.dayNumber === sourceDayNum);
+      const destDayIdx = trip.days.findIndex(d => d.dayNumber === destDayNum);
+      if (sourceDayIdx === -1 || destDayIdx === -1) return;
+
+      const newDays = JSON.parse(JSON.stringify(trip.days)) as DayPlan[];
+      
+      const sourceActivities = newDays[sourceDayIdx].activities;
+      const destActivities = sourceDayNum === destDayNum ? sourceActivities : newDays[destDayIdx].activities;
+
+      const [movedActivity] = sourceActivities.splice(source.index, 1);
+      destActivities.splice(destination.index, 0, movedActivity);
+
+      if (onUpdateDays) {
+        onUpdateDays(newDays);
+      }
+    }
   }
 
   return (
@@ -127,7 +147,7 @@ export default function ItineraryTab({ trip, onAddActivity, onEditActivity, onDe
           ))
         ) : (
           <DragDropContext onDragEnd={handleDragEnd}>
-            <Droppable droppableId="days-list">
+            <Droppable droppableId="days-list" type="day">
               {(provided) => (
                 <div
                   ref={provided.innerRef}

@@ -328,6 +328,12 @@ export default function TripDetailPage({ params }: { params: Promise<{ tripId: s
     await updateTrip(trip.id, { days: renumbered });
   }, [trip, updateTrip, setLocalTrip]);
 
+  const handleUpdateDays = useCallback(async (newDays: import("@/types/trip").DayPlan[]) => {
+    if (!trip) return;
+    setLocalTrip((prev) => prev ? { ...prev, days: newDays } : prev);
+    await updateTrip(trip.id, { days: newDays });
+  }, [trip, updateTrip, setLocalTrip]);
+
   if (!isLoaded) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#f4ecd8] dark:bg-[#28211d]">
@@ -403,6 +409,7 @@ export default function TripDetailPage({ params }: { params: Promise<{ tripId: s
             onEditActivity={handleEditActivity}
             onDeleteActivity={handleDeleteActivity}
             onReorderDays={handleReorderDays}
+            onUpdateDays={handleUpdateDays}
             customCategories={trip.customCategories || []}
             onAddCustomCategory={handleAddCustomCategory}
             setRefreshToggle={setRefreshToggle}
