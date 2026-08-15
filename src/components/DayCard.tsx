@@ -9,6 +9,7 @@ import ActivityRow from "@/components/ActivityRow";
 interface DayCardProps {
   day: DayPlan;
   destination: string;
+  tripStartDate: string;
   defaultOpen?: boolean;
   dragHandleProps?: DraggableProvidedDragHandleProps | null;
   onEditActivity: (dayNumber: number, activity: ActivityItem) => void;
@@ -16,7 +17,7 @@ interface DayCardProps {
   customCategories?: { id: string; label: string; emoji: string }[];
 }
 
-export default function DayCard({ day, destination, defaultOpen = true, dragHandleProps, onEditActivity, onDeleteActivity, customCategories = [] }: DayCardProps) {
+export default function DayCard({ day, destination, tripStartDate, defaultOpen = true, dragHandleProps, onEditActivity, onDeleteActivity, customCategories = [] }: DayCardProps) {
   const [open, setOpen] = useState(defaultOpen);
 
   return (
@@ -108,7 +109,7 @@ export default function DayCard({ day, destination, defaultOpen = true, dragHand
                             destination={destination}
                             isLast={idx === day.activities.length - 1 && !dragSnapshot.isDragging}
                             dayNumber={day.dayNumber}
-                            date={day.date}
+                            tripStartDate={tripStartDate}
                             customCategories={customCategories}
                             onEdit={(a) => onEditActivity(day.dayNumber, a)}
                             onDelete={(id) => onDeleteActivity(day.dayNumber, id)}

@@ -71,6 +71,16 @@ export default function ItineraryTab({ trip, onAddActivity, onEditActivity, onDe
       const destActivities = sourceDayNum === destDayNum ? sourceActivities : newDays[destDayIdx].activities;
 
       const [movedActivity] = sourceActivities.splice(source.index, 1);
+
+      // Compute newDate dynamically based on trip.startDate for the grading engine
+      const tripStartDate = new Date(trip.startDate);
+      tripStartDate.setDate(tripStartDate.getDate() + destDayNum - 1);
+      const newDateStr = tripStartDate.toISOString().split("T")[0];
+
+      // Update local optimistic React state with BOTH updated day_number and date
+      (movedActivity as any).day_number = destDayNum;
+      (movedActivity as any).date = newDateStr;
+
       destActivities.splice(destination.index, 0, movedActivity);
 
       if (onUpdateDays) {
@@ -174,6 +184,7 @@ export default function ItineraryTab({ trip, onAddActivity, onEditActivity, onDe
                           <DayCard
                             day={day}
                             destination={trip.destination}
+                            tripStartDate={trip.startDate}
                             defaultOpen={false}
                             customCategories={customCategories}
                             dragHandleProps={dragProvided.dragHandleProps}

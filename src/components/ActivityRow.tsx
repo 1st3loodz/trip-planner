@@ -11,7 +11,7 @@ interface ActivityRowProps {
   onEdit: (activity: ActivityItem) => void;
   onDelete: (id: string) => void;
   dayNumber: number;
-  date: string;
+  tripStartDate: string;
   customCategories?: { id: string; label: string; emoji: string }[];
   dragHandleProps?: DraggableProvidedDragHandleProps | null;
 }
@@ -27,13 +27,18 @@ const COZY_CATEGORY_STYLE: Record<ActivityCategory, { bg: string; border: string
   shopping:    { bg: "#fce7f3", border: "#f9a8d4", text: "#9d174d" }, // soft blush
 };
 
-export default function ActivityRow({ activity, destination, isLast, onEdit, onDelete, dayNumber, date, customCategories = [], dragHandleProps }: ActivityRowProps) {
+export default function ActivityRow({ activity, destination, isLast, onEdit, onDelete, dayNumber, tripStartDate, customCategories = [], dragHandleProps }: ActivityRowProps) {
   const customCat = customCategories.find((c) => c.id === activity.category);
   const meta      = ACTIVITY_CATEGORY_META[activity.category] || { label: customCat?.label || activity.category, emoji: customCat?.emoji || "✨" };
   const cozyStyle = COZY_CATEGORY_STYLE[activity.category] || { bg: "#f3f4f6", border: "#d1d5db", text: "#374151" }; // neutral gray fallback for custom
 
   const destLower = destination?.toLowerCase() || "";
   const showAmap = ["china", "cn", "จีน", "beijing", "shanghai", "guangzhou", "shenzhen", "chengdu", "chongqing", "mainland"].some(str => destLower.includes(str));
+
+  // Dynamically compute date based on trip start date
+  const targetDate = new Date(tripStartDate);
+  targetDate.setDate(targetDate.getDate() + dayNumber - 1);
+  const computedDate = targetDate.toISOString().split("T")[0];
 
   return (
     <div className="group relative flex gap-3 py-4 bg-[#fdfbf7] dark:bg-[#28211d] hover:bg-[#f5eed7] dark:hover:bg-[#2d2620] px-2 -mx-2 rounded transition-colors duration-100 items-start">
@@ -96,7 +101,7 @@ export default function ActivityRow({ activity, destination, isLast, onEdit, onD
           </span>
           {/* Day/Date badge */}
           <span className="font-mono text-[9px] px-2 py-0.5 text-stone-500 border border-stone-300 dark:border-stone-600 rounded bg-[#f5eed7]/50 dark:bg-[#362d28]/50">
-            Day {dayNumber} ({formatDate(date)})
+            Day {dayNumber} ({formatDate(computedDate)})
           </span>
         </div>
 
