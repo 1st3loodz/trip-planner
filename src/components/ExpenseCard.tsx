@@ -40,12 +40,13 @@ export default function ExpenseCard({ expense, participants, onEdit, onDelete, c
         <div className="flex items-center gap-1.5 shrink-0">
           <div className="flex flex-col items-end gap-0.5">
             <span className={`font-mono text-base font-black tabular-nums text-stone-800 dark:text-[#fdfbf7] ${expense.isExcluded ? 'line-through opacity-70' : ''}`}>
-              {formatCurrency(
-                (!expense.foreignAmount && expense.currency !== baseCurrency && expense.historicalBaseAmount !== undefined) 
-                  ? expense.historicalBaseAmount 
-                  : expense.amount, 
-                baseCurrency
-              )}
+              {(() => {
+                const effectiveRate = Number((expense as any).custom_exchange_rate) || Number(expense.exchangeRate) || Number((expense as any).exchange_rate) || Number(expense.historicalRate) || 1;
+                const totalBillTHB = (expense.currency !== baseCurrency && Number(expense.foreignAmount) > 0)
+                  ? Number(expense.foreignAmount) * effectiveRate
+                  : Number(expense.amount) || 0;
+                return formatCurrency(totalBillTHB, baseCurrency);
+              })()}
             </span>
             {(expense.foreignAmount || (!expense.foreignAmount && expense.currency !== baseCurrency)) && (
               <span className="font-mono text-[9px] text-stone-500 dark:text-stone-400">
@@ -53,7 +54,10 @@ export default function ExpenseCard({ expense, participants, onEdit, onDelete, c
                   expense.foreignAmount || expense.amount, 
                   expense.currency
                 )} 
-                {expense.exchangeRate || expense.historicalRate ? ` (@ ${expense.exchangeRate || expense.historicalRate})` : ""}
+                {(() => {
+                  const effectiveRate = Number((expense as any).custom_exchange_rate) || Number(expense.exchangeRate) || Number((expense as any).exchange_rate) || Number(expense.historicalRate) || 1;
+                  return effectiveRate !== 1 ? ` (@ ${effectiveRate})` : "";
+                })()}
               </span>
             )}
           </div>

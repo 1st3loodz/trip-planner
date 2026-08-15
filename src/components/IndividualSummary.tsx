@@ -36,32 +36,51 @@ export default function IndividualSummary({ expenses, participants, customCatego
   const allGroups = useMemo<DayGroup[]>(() => {
     const map = new Map<string, LedgerEntry[]>();
     for (const exp of expenses) {
+      const effectiveRate = Number((exp as any).custom_exchange_rate) || Number(exp.exchangeRate) || Number((exp as any).exchange_rate) || Number(exp.historicalRate) || 1;
       const isLegacy = exp.foreignAmount === undefined && exp.currency !== baseCurrency;
-      const effectiveRate = exp.exchangeRate ?? exp.historicalRate ?? ((exp.foreignAmount && exp.foreignAmount > 0) ? exp.amount / exp.foreignAmount : 1);
       
+      const totalBillTHB = (exp.currency !== baseCurrency && Number(exp.foreignAmount) > 0)
+        ? Number(exp.foreignAmount) * effectiveRate
+        : Number(exp.amount) || 0;
+        
       const actualPaidById = exp.paidById || (exp as any).paid_by || (exp as any).payer_id || (exp as any).created_by || (exp as any).createdBy;
       
-      const getShareBase = (amt: number) => isLegacy ? convertToBase(amt, exp.currency, rates) : amt;
-      const getShareForeign = (amt: number) => isLegacy ? amt : amt / effectiveRate;
+      const getShareForeign = (amtBase: number) => isLegacy ? amtBase : amtBase / effectiveRate;
 
       if (exp.isExcluded) {
         const split = exp.splits.find((s) => s.participantId === selectedId);
         if (actualPaidById === selectedId || split) {
           const list = map.get(exp.date) ?? [];
-          const rawAmt = split ? parseFloat(split.amount as any) || 0 : 0;
-          const amt = actualPaidById === selectedId ? (parseFloat(exp.amount as any) || 0) : rawAmt;
           
-          list.push({ expense: exp, share: getShareForeign(amt), shareBase: getShareBase(amt), isPersonal: true });
+          let memberShareTHB = 0;
+          if (actualPaidById === selectedId) {
+            memberShareTHB = totalBillTHB;
+          } else if (split) {
+            if (exp.splitType === 'CUSTOM') {
+              memberShareTHB = isLegacy ? Number(split.amount) * effectiveRate : Number(split.amount);
+            } else {
+              memberShareTHB = totalBillTHB / (exp.splits.length || 1);
+            }
+          }
+          
+          list.push({ expense: exp, share: getShareForeign(memberShareTHB), shareBase: memberShareTHB, isPersonal: true });
           map.set(exp.date, list);
         }
         continue;
       }
+      
       const split = exp.splits.find((s) => s.participantId === selectedId);
       if (!split) continue;
-      const list = map.get(exp.date) ?? [];
-      const amt = parseFloat(split.amount as any) || 0;
       
-      list.push({ expense: exp, share: getShareForeign(amt), shareBase: getShareBase(amt), isPersonal: false });
+      const list = map.get(exp.date) ?? [];
+      let memberShareTHB = 0;
+      if (exp.splitType === 'CUSTOM') {
+        memberShareTHB = isLegacy ? Number(split.amount) * effectiveRate : Number(split.amount);
+      } else {
+        memberShareTHB = totalBillTHB / (exp.splits.length || 1);
+      }
+      
+      list.push({ expense: exp, share: getShareForeign(memberShareTHB), shareBase: memberShareTHB, isPersonal: false });
       map.set(exp.date, list);
     }
     return Array.from(map.entries())
@@ -256,10 +275,12 @@ export default function IndividualSummary({ expenses, participants, customCatego
                     const actualPaidById = expense.paidById || (expense as any).paid_by || (expense as any).payer_id || (expense as any).created_by || (expense as any).createdBy;
                     const isPayer  = actualPaidById === selectedId;
                     
-                    const isLegacy = expense.foreignAmount === undefined && expense.currency !== baseCurrency;
-                    const effectiveRate = expense.exchangeRate ?? expense.historicalRate ?? ((expense.foreignAmount && expense.foreignAmount > 0) ? expense.amount / expense.foreignAmount : 1);
-                    const expBaseAmt = isLegacy ? (expense.historicalBaseAmount ?? convertToBase(expense.amount, expense.currency, rates)) : expense.amount;
-                    const owedBase = isPayer ? Math.max(0, expBaseAmt - shareBase) : 0;
+                    const effectiveRate = Number((expense as any).custom_exchange_rate) || Number(expense.exchangeRate) || Number((expense as any).exchange_rate) || Number(expense.historicalRate) || 1;
+                    const totalBillTHB = (expense.currency !== baseCurrency && Number(expense.foreignAmount) > 0)
+                      ? Number(expense.foreignAmount) * effectiveRate
+                      : Number(expense.amount) || 0;
+                      
+                    const owedBase = isPayer ? Math.max(0, totalBillTHB - shareBase) : 0;
                     
                     return (
                       <div key={expense.id} className="flex items-center gap-3 px-4 py-3">
@@ -273,7 +294,7 @@ export default function IndividualSummary({ expenses, participants, customCatego
                             {expense.currency !== baseCurrency && (
                               <span className="mr-1">{cur?.flag} {formatCurrency(expense.foreignAmount ?? expense.amount, expense.currency)} (Rate: {effectiveRate}) ➔ </span>
                             )}
-                            Total: {formatBase(expBaseAmt, baseCurrency)} | Your share: {formatBase(shareBase, baseCurrency)}
+                            Total: {formatBase(totalBillTHB, baseCurrency)} | Your share: {formatBase(shareBase, baseCurrency)}
                           </p>
                           <div className="flex flex-wrap items-center gap-1.5 mt-1">
                             <span className={`text-[10px] border px-1.5 py-px font-mono font-semibold ${cat.color} text-stone-800`}>
