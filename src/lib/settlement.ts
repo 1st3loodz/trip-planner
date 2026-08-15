@@ -122,9 +122,13 @@ export function computeSettlementsInBase(
       const splitAmt = parseFloat(split.amount as any) || 0;
       
       // Convert this split's share to base currency
-      const shareBase = exp.historicalRate
-        ? splitAmt * exp.historicalRate
-        : convertToBase(splitAmt, exp.currency, rates);
+      // For new foreign expenses, split.amount is already in base currency.
+      // For legacy foreign expenses, split.amount is in foreign currency and needs conversion.
+      const shareBase = (exp.foreignAmount !== undefined) 
+        ? splitAmt 
+        : (exp.historicalRate
+          ? splitAmt * exp.historicalRate
+          : convertToBase(splitAmt, exp.currency, rates));
 
       if (shareBase <= 0) continue;
 

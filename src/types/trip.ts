@@ -92,6 +92,10 @@ export interface Expense {
   historicalRate?: number;
   /** Frozen base currency amount at the moment of creation */
   historicalBaseAmount?: number;
+  /** Original foreign amount if this expense was recorded in a foreign currency */
+  foreignAmount?: number;
+  /** Custom exchange rate used for this transaction */
+  exchangeRate?: number;
 }
 
 // ─── Itinerary ────────────────────────────────────────────────────────────────

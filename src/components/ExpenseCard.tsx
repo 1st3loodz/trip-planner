@@ -1,8 +1,9 @@
 "use client";
 
-import { Expense, Participant, EXPENSE_CATEGORY_META, CURRENCY_META } from "@/types/trip";
+import { Expense, Participant, EXPENSE_CATEGORY_META, CURRENCY_META, Currency } from "@/types/trip";
 import { formatCurrency } from "@/lib/utils";
 import Avatar from "@/components/Avatar";
+import { useCurrency } from "@/contexts/CurrencyContext";
 
 interface ExpenseCardProps {
   expense: Expense;
@@ -13,6 +14,7 @@ interface ExpenseCardProps {
 }
 
 export default function ExpenseCard({ expense, participants, onEdit, onDelete, customCategories = [] }: ExpenseCardProps) {
+  const { baseCurrency } = useCurrency();
   const customCat = customCategories.find((c) => c.id === expense.category);
   const cat = EXPENSE_CATEGORY_META[expense.category] || { label: customCat?.label || expense.category, emoji: customCat?.emoji || "✨", color: "bg-stone-500/15 text-stone-600 border-stone-500/30 dark:text-stone-300" };
   const cur = CURRENCY_META[expense.currency];
@@ -36,7 +38,25 @@ export default function ExpenseCard({ expense, participants, onEdit, onDelete, c
           {expense.isExcluded && <span className="shrink-0 border-2 border-stone-500 bg-stone-300 px-2 py-0.5 font-pixel text-[8px] uppercase text-stone-700 dark:border-stone-500 dark:bg-[#362d28] dark:text-stone-400">🚫 EXCLUDED</span>}
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
-          <span className={`font-mono text-base font-black tabular-nums text-stone-800 dark:text-[#fdfbf7] ${expense.isExcluded ? 'line-through opacity-70' : ''}`}>{formatCurrency(expense.amount, expense.currency)}</span>
+          <div className="flex flex-col items-end gap-0.5">
+            <span className={`font-mono text-base font-black tabular-nums text-stone-800 dark:text-[#fdfbf7] ${expense.isExcluded ? 'line-through opacity-70' : ''}`}>
+              {formatCurrency(
+                (!expense.foreignAmount && expense.currency !== baseCurrency && expense.historicalBaseAmount !== undefined) 
+                  ? expense.historicalBaseAmount 
+                  : expense.amount, 
+                baseCurrency
+              )}
+            </span>
+            {(expense.foreignAmount || (!expense.foreignAmount && expense.currency !== baseCurrency)) && (
+              <span className="font-mono text-[9px] text-stone-500 dark:text-stone-400">
+                {formatCurrency(
+                  expense.foreignAmount || expense.amount, 
+                  expense.currency
+                )} 
+                {expense.exchangeRate || expense.historicalRate ? ` (@ ${expense.exchangeRate || expense.historicalRate})` : ""}
+              </span>
+            )}
+          </div>
           <button onClick={() => onEdit(expense)} title="Edit expense"
             className="flex h-7 w-7 items-center justify-center border-2 border-stone-300 bg-[#fdfbf7] text-stone-500 opacity-100 transition-all md:opacity-0 md:group-hover:opacity-100 hover:border-stone-800 hover:bg-[#f5eed7] hover:text-stone-800 dark:border-[#54463d] dark:bg-[#28211d] dark:text-stone-500 dark:hover:border-stone-600 dark:hover:bg-[#362d28] dark:hover:text-[#fdfbf7]">
             <PencilIcon />

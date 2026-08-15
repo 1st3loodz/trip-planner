@@ -21,7 +21,10 @@ const CATEGORIES = Object.keys(EXPENSE_CATEGORY_META) as ExpenseCategory[];
 export default function AddExpenseModal({ participants, initialExpense, onSave, onClose, customCategories, onAddCustomCategory }: AddExpenseModalProps) {
   const isEdit = !!initialExpense;
   const [description, setDescription] = useState(initialExpense?.description ?? "");
-  const [amount,      setAmount]      = useState(initialExpense?.amount.toString() ?? "");
+  const [amount, setAmount] = useState(initialExpense?.foreignAmount?.toString() ?? initialExpense?.amount.toString() ?? "");
+  const [customRate, setCustomRate] = useState(initialExpense?.exchangeRate?.toString() ?? "");
+  const [useCustomRate, setUseCustomRate] = useState(!!initialExpense?.exchangeRate);
+  const [fetchedRate, setFetchedRate] = useState<number | null>(initialExpense?.historicalRate ?? null);
   const [currency,    setCurrency]    = useState<Currency>(initialExpense?.currency ?? "CNY");
   const [category,    setCategory]    = useState<ExpenseCategory>(initialExpense?.category ?? "food");
   const actualInitialPayer = initialExpense ? (initialExpense.paidById || (initialExpense as any).paid_by || (initialExpense as any).payer_id || (initialExpense as any).created_by || (initialExpense as any).createdBy) : undefined;
@@ -39,6 +42,37 @@ export default function AddExpenseModal({ participants, initialExpense, onSave, 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const { baseCurrency, rates } = useCurrency();
+
+  useEffect(() => {
+    if (currency === baseCurrency) return;
+    let active = true;
+    const fetchRate = async () => {
+      try {
+        const res = await fetch(`https://open.er-api.com/v6/latest/${currency}`);
+        if (res.ok && active) {
+          const data = await res.json();
+          if (data?.rates?.[baseCurrency]) {
+            setFetchedRate(data.rates[baseCurrency]);
+          }
+        }
+      } catch {
+        // ignore
+      }
+    };
+    fetchRate();
+    return () => { active = false; };
+  }, [currency, baseCurrency]);
+
+  const foreignNum = parseFloat(amount);
+  const isForeign = currency !== baseCurrency;
+  
+  const effectiveRate = isForeign
+    ? (useCustomRate ? parseFloat(customRate) : (fetchedRate ?? rates[currency] ?? 1))
+    : 1;
+
+  const baseNum = !isNaN(foreignNum) && foreignNum > 0 
+    ? parseFloat((foreignNum * effectiveRate).toFixed(2)) 
+    : 0;
 
   const [isAddingCategory, setIsAddingCategory] = useState(false);
   const [newCatEmoji, setNewCatEmoji] = useState("✨");
@@ -97,56 +131,49 @@ export default function AddExpenseModal({ participants, initialExpense, onSave, 
       errs.date = "Date must be DD/MM/YYYY.";
     }
 
-    const num = parseFloat(amount);
-    if (!amount || isNaN(num) || num <= 0) errs.amount = "Enter a valid amount.";
+    const foreignNumSubmit = parseFloat(amount);
+    if (!amount || isNaN(foreignNumSubmit) || foreignNumSubmit <= 0) errs.amount = "Enter a valid amount.";
+    
+    let finalRate = isForeign ? (useCustomRate ? parseFloat(customRate) : (fetchedRate ?? rates[currency] ?? 1)) : 1;
+    if (isForeign && (isNaN(finalRate) || finalRate <= 0)) {
+      errs.rate = "Invalid exchange rate.";
+    }
+
     if (Object.keys(errs).length) { setErrors(errs); return; }
 
     setIsSubmitting(true);
-    let hRate = initialExpense?.historicalRate;
 
-    if (!hRate || initialExpense?.currency !== currency) {
-      if (currency === baseCurrency) {
-        hRate = 1;
-      } else {
-        try {
-          const res = await fetch(`https://open.er-api.com/v6/latest/${currency}`);
-          if (res.ok) {
-            const data = await res.json();
-            if (data?.rates?.[baseCurrency]) {
-              hRate = data.rates[baseCurrency];
-            }
-          }
-        } catch (error) {
-          console.error("Live FX fetch failed, falling back to context rates:", error);
-        }
-        if (!hRate) {
-          hRate = rates[currency] ?? 1;
-        }
-      }
-    }
-
-    const hBaseAmount = parseFloat((num * (hRate ?? 1)).toFixed(2));
     const splitArray = splitIds.size > 0 ? Array.from(splitIds) : [paidById];
-    const perPerson  = num / splitArray.length;
+    const finalBaseAmount = parseFloat((foreignNumSubmit * finalRate).toFixed(2));
+    const perPersonSplit = finalBaseAmount / splitArray.length;
 
     onSave({
       id: initialExpense?.id ?? `e-${generateId()}`,
-      description: description.trim(), amount: num, currency, category, paidById, date: isoDate, isExcluded,
-      paid_by: paidById, // explicitly save as snake_case for backend compatibility
-      split_with: splitArray, // explicitly save array of IDs for backend compatibility
-      expense_date: isoDate, // explicitly save as snake_case for backend compatibility
-      splits: splitArray.map((id) => ({ participantId: id, amount: parseFloat(perPerson.toFixed(2)) })),
+      description: description.trim(), 
+      amount: finalBaseAmount, // Saved as base amount THB
+      currency, 
+      category, 
+      paidById, 
+      date: isoDate, 
+      isExcluded,
+      paid_by: paidById,
+      split_with: splitArray,
+      expense_date: isoDate,
+      foreignAmount: isForeign ? foreignNumSubmit : undefined,
+      foreign_amount: isForeign ? foreignNumSubmit : undefined,
+      exchangeRate: isForeign && useCustomRate ? finalRate : undefined,
+      exchange_rate: isForeign && useCustomRate ? finalRate : undefined,
+      historicalRate: finalRate,
+      splits: splitArray.map((id) => ({ participantId: id, amount: parseFloat(perPersonSplit.toFixed(2)) })),
       createdAt: initialExpense?.createdAt ?? new Date().toISOString(),
-      historicalRate: hRate,
-      historicalBaseAmount: hBaseAmount,
-    } as Expense & { paid_by: string; split_with: string[]; expense_date: string });
+      historicalBaseAmount: finalBaseAmount,
+    } as any);
     
     setIsSubmitting(false);
     onClose();
   }
 
-  const num = parseFloat(amount);
-  const perPerson = !isNaN(num) && num > 0 ? (splitIds.size > 0 ? (num / splitIds.size).toFixed(2) : num.toFixed(2)) : null;
+  const perPerson = baseNum > 0 ? (splitIds.size > 0 ? (baseNum / splitIds.size).toFixed(2) : baseNum.toFixed(2)) : null;
 
   const inputCls = (err?: string) =>
     `w-full border-2 bg-[#fdfbf7] px-3.5 py-2.5 font-mono text-sm text-stone-900 placeholder-stone-400 outline-none focus:border-stone-800 dark:bg-[#1e1815] dark:text-[#fdfbf7] dark:placeholder-stone-500 ${err ? "border-red-400 dark:border-red-500" : "border-stone-400 dark:border-stone-600"}`;
@@ -193,10 +220,41 @@ export default function AddExpenseModal({ participants, initialExpense, onSave, 
               <label className="mb-1.5 block font-pixel text-[8px] uppercase tracking-widest text-stone-600 dark:text-stone-400">Currency</label>
               <select value={currency} onChange={(e) => setCurrency(e.target.value as Currency)}
                 className="w-full border-2 border-stone-400 bg-[#fdfbf7] px-3.5 py-2.5 font-mono text-sm text-stone-900 outline-none focus:border-stone-800 dark:border-stone-600 dark:bg-[#1e1815] dark:text-[#fdfbf7]">
-                {CURRENCIES.map((c) => <option key={c} value={c}>{CURRENCY_META[c].flag} {c} — {CURRENCY_META[c].label}</option>)}
+                {CURRENCIES.map((c) => <option key={c} value={c}>{CURRENCY_META[c].flag} {c}</option>)}
               </select>
             </div>
           </div>
+
+          {isForeign && (
+            <div className="border-2 border-stone-400 bg-[#fdfbf7] p-3 dark:border-stone-600 dark:bg-[#1e1815]">
+              <div className="mb-2 flex items-center justify-between">
+                <label className="font-pixel text-[8px] uppercase tracking-widest text-stone-600 dark:text-stone-400">Exchange Rate (1 {currency} = ? {baseCurrency})</label>
+                <div className="flex items-center gap-2 font-mono text-[10px]">
+                  <button type="button" onClick={() => setUseCustomRate(false)} className={`${!useCustomRate ? "font-bold text-stone-900 dark:text-stone-200 underline" : "text-stone-500"}`}>Auto</button>
+                  <span>|</span>
+                  <button type="button" onClick={() => setUseCustomRate(true)} className={`${useCustomRate ? "font-bold text-stone-900 dark:text-stone-200 underline" : "text-stone-500"}`}>Custom</button>
+                </div>
+              </div>
+              
+              <div className="flex items-center gap-2">
+                <input 
+                  type="number" 
+                  min="0" step="any" 
+                  value={useCustomRate ? customRate : (fetchedRate ?? rates[currency] ?? "")} 
+                  onChange={(e) => { setCustomRate(e.target.value); setUseCustomRate(true); }} 
+                  disabled={!useCustomRate}
+                  className={inputCls(errors.rate)} 
+                  placeholder="Rate"
+                />
+              </div>
+              {errors.rate && <p className="mt-1 font-mono text-[10px] text-red-600 dark:text-red-400">{errors.rate}</p>}
+              
+              <div className="mt-3 flex items-center justify-between border-t-2 border-stone-300 pt-3 dark:border-stone-700">
+                <span className="font-mono text-[10px] font-semibold text-stone-600 dark:text-stone-400">Final Converted Amount ({baseCurrency}):</span>
+                <span className="font-mono text-sm font-black tabular-nums text-stone-900 dark:text-[#fdfbf7]">{baseNum > 0 ? baseNum.toFixed(2) : "0.00"} {baseCurrency}</span>
+              </div>
+            </div>
+          )}
 
           {/* Category */}
           <div>
