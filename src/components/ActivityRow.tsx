@@ -1,7 +1,7 @@
 "use client";
 
 import { ActivityItem, ActivityCategory } from "@/types/trip";
-import { ACTIVITY_CATEGORY_META, formatDate } from "@/lib/utils";
+import { ACTIVITY_CATEGORY_META, formatDate, addDaysToISO } from "@/lib/utils";
 import { DraggableProvidedDragHandleProps } from "@hello-pangea/dnd";
 
 interface ActivityRowProps {
@@ -35,10 +35,8 @@ export default function ActivityRow({ activity, destination, isLast, onEdit, onD
   const destLower = destination?.toLowerCase() || "";
   const showAmap = ["china", "cn", "จีน", "beijing", "shanghai", "guangzhou", "shenzhen", "chengdu", "chongqing", "mainland"].some(str => destLower.includes(str));
 
-  // Dynamically compute date based on trip start date
-  const targetDate = new Date(tripStartDate);
-  targetDate.setDate(targetDate.getDate() + dayNumber - 1);
-  const computedDate = targetDate.toISOString().split("T")[0];
+  // Dynamically compute date based on trip start date — timezone-safe local-date math
+  const computedDate = addDaysToISO(tripStartDate, dayNumber - 1);
 
   return (
     <div className="group relative flex gap-3 py-4 bg-[#fdfbf7] dark:bg-[#28211d] hover:bg-[#f5eed7] dark:hover:bg-[#2d2620] px-2 -mx-2 rounded transition-colors duration-100 items-start">

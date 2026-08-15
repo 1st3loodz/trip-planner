@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import { Trip, ActivityItem, ActivityCategory, DayPlan } from "@/types/trip";
-import { ACTIVITY_CATEGORY_META } from "@/lib/utils";
+import { ACTIVITY_CATEGORY_META, addDaysToISO } from "@/lib/utils";
 import DayCard from "@/components/DayCard";
 import AddActivityModal from "@/components/AddActivityModal";
 import ActualLogTab from "@/components/ActualLogTab";
@@ -72,10 +72,8 @@ export default function ItineraryTab({ trip, onAddActivity, onEditActivity, onDe
 
       const [movedActivity] = sourceActivities.splice(source.index, 1);
 
-      // Compute newDate dynamically based on trip.startDate for the grading engine
-      const tripStartDate = new Date(trip.startDate);
-      tripStartDate.setDate(tripStartDate.getDate() + destDayNum - 1);
-      const newDateStr = tripStartDate.toISOString().split("T")[0];
+      // Compute newDate timezone-safely using local-date math
+      const newDateStr = addDaysToISO(trip.startDate, destDayNum - 1);
 
       // Update local optimistic React state with BOTH updated day_number and date
       (movedActivity as any).day_number = destDayNum;

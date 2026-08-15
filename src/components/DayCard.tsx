@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { DraggableProvidedDragHandleProps, Droppable, Draggable } from "@hello-pangea/dnd";
 import { DayPlan, ActivityItem } from "@/types/trip";
-import { formatDate } from "@/lib/utils";
+import { formatDate, addDaysToISO } from "@/lib/utils";
 import ActivityRow from "@/components/ActivityRow";
 
 interface DayCardProps {
@@ -21,12 +21,8 @@ export default function DayCard({ day, destination, tripStartDate, defaultOpen =
   const [open, setOpen] = useState(defaultOpen);
 
   // Compute this day's date dynamically from the trip start date + dayNumber offset.
-  // This is the single source of truth — never use day.date which can be stale.
-  const computedDayDate = (() => {
-    const d = new Date(tripStartDate);
-    d.setDate(d.getDate() + day.dayNumber - 1);
-    return d.toISOString().split("T")[0];
-  })();
+  // Uses timezone-safe local-date math (addDaysToISO) — never use day.date which can be stale.
+  const computedDayDate = addDaysToISO(tripStartDate, day.dayNumber - 1);
 
   return (
     <section className="mb-5">

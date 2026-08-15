@@ -25,14 +25,40 @@ export function formatCurrency(amount: number, currency: string): string {
   }).format(amount);
 }
 
+/**
+ * Parse an ISO date string (YYYY-MM-DD) into local Date parts without any UTC shift.
+ * `new Date("YYYY-MM-DD")` parses as UTC midnight which shifts the day in non-UTC timezones.
+ * This avoids that by constructing the date in local time directly.
+ */
+export function parseISOLocal(isoDate: string): Date {
+  const [y, m, d] = isoDate.split("-").map(Number);
+  return new Date(y, m - 1, d); // month is 0-indexed; always local time
+}
+
+/**
+ * Add N days to an ISO date string and return a new ISO date string (YYYY-MM-DD).
+ * Uses local-time math to avoid UTC off-by-one errors.
+ */
+export function addDaysToISO(isoDate: string, days: number): string {
+  const d = parseISOLocal(isoDate);
+  d.setDate(d.getDate() + days);
+  const yy = d.getFullYear();
+  const mm  = String(d.getMonth() + 1).padStart(2, "0");
+  const dd  = String(d.getDate()).padStart(2, "0");
+  return `${yy}-${mm}-${dd}`;
+}
+
+/**
+ * Format an ISO date string as DD/MM/YYYY using local-time parsing.
+ * Avoids the UTC-shift bug in `new Date("YYYY-MM-DD").toLocaleDateString()`.
+ */
 export function formatDate(isoDate: string): string {
   if (!isoDate) return "—";
-  // Use en-GB locale to enforce DD/MM/YY formatting order
-  return new Date(isoDate).toLocaleDateString("en-GB", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "2-digit",
-  });
+  const d = parseISOLocal(isoDate);
+  const dd  = String(d.getDate()).padStart(2, "0");
+  const mm  = String(d.getMonth() + 1).padStart(2, "0");
+  const yyyy = d.getFullYear();
+  return `${dd}/${mm}/${yyyy}`;
 }
 
 export function getInitials(name: string): string {

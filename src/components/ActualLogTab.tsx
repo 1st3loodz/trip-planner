@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import { createClient } from "@/utils/supabase/client";
 import { DayPlan } from "@/types/trip";
+import { addDaysToISO } from "@/lib/utils";
 import EditActualModal from "./EditActualModal";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
@@ -35,13 +36,11 @@ function safeDays(d: DayPlan[] | undefined | null): DayPlan[] {
 }
 
 /**
- * Compute a day's ISO date string directly from the trip start date + offset.
- * This is the single source of truth — never rely on day.date which can be stale.
+ * Compute a day's ISO date string from trip start date + offset.
+ * Delegates to addDaysToISO which uses timezone-safe local-date math.
  */
 function computeDateForDay(tripStartDate: string, dayNum: number): string {
-  const d = new Date(tripStartDate + "T00:00:00");
-  d.setDate(d.getDate() + dayNum - 1);
-  return d.toISOString().split("T")[0];
+  return addDaysToISO(tripStartDate, dayNum - 1);
 }
 
 function buildDayLabel(dayNum: number, tripStartDate: string): string {
