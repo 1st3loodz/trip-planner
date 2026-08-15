@@ -44,34 +44,37 @@ export default function MemberCategoryChart({ memberId, memberName, expenses, cu
 
   // Compute category totals for this member (in base currency)
   const categoryTotals = useMemo(() => {
-    const totals: Partial<Record<ExpenseCategory, number>> = {};
+    const totals: Partial<Record<string, number>> = {};
     for (const exp of expenses) {
-      if (exp.isExcluded) {
-        if (exp.paidById === memberId) {
-          const base = convertToBase(exp.amount, exp.currency, rates);
-          totals[exp.category] = (totals[exp.category] ?? 0) + base;
+      const cat = exp?.category?.trim() || "other";
+      const actualPaidById = exp?.paidById || (exp as any)?.paid_by || (exp as any)?.payer_id || (exp as any)?.created_by || (exp as any)?.createdBy;
+      
+      if (exp?.isExcluded) {
+        if (actualPaidById === memberId) {
+          const base = convertToBase(Number(exp?.amount) || 0, exp?.currency || baseCurrency, rates);
+          totals[cat] = (totals[cat] ?? 0) + base;
         }
         continue;
       }
-      const split = exp.splits.find((s) => s.participantId === memberId);
+      const split = (exp?.splits || []).find((s) => s.participantId === memberId);
       if (!split) continue;
-      const base = convertToBase(split.amount, exp.currency, rates);
-      totals[exp.category] = (totals[exp.category] ?? 0) + base;
+      const base = convertToBase(Number(split.amount) || 0, exp?.currency || baseCurrency, rates);
+      totals[cat] = (totals[cat] ?? 0) + base;
     }
     return totals;
-  }, [expenses, memberId, rates]);
+  }, [expenses, memberId, rates, baseCurrency]);
 
-  const grandTotal = Object.values(categoryTotals).reduce((s, v) => s + (v ?? 0), 0);
+  const grandTotal: number = Object.values(categoryTotals).reduce<number>((s, v) => (s ?? 0) + (v ?? 0), 0);
 
   // Build segments
   const segments = useMemo(() => {
     let angle = 0;
     const allPresentCats = Array.from(new Set(expenses.filter(e => {
-      const actualPaidById = e.paidById || (e as any).paid_by || (e as any).payer_id || (e as any).created_by || (e as any).createdBy;
-      if (e.isExcluded) return actualPaidById === memberId;
-      const split = e.splits.find((s) => s.participantId === memberId);
+      const actualPaidById = e?.paidById || (e as any)?.paid_by || (e as any)?.payer_id || (e as any)?.created_by || (e as any)?.createdBy;
+      if (e?.isExcluded) return actualPaidById === memberId;
+      const split = (e?.splits || []).find((s) => s.participantId === memberId);
       return actualPaidById === memberId || !!split;
-    }).map(e => e.category)));
+    }).map(e => e?.category?.trim() || "other")));
     return allPresentCats
       .filter((cat) => (categoryTotals[cat] ?? 0) > 0)
       .map((cat) => {
@@ -102,7 +105,7 @@ export default function MemberCategoryChart({ memberId, memberName, expenses, cu
         <div className="shrink-0">
           <svg width={180} height={180} viewBox="0 0 180 180">
             {segments.map((seg) => {
-              const color = CATEGORY_HEX[seg.cat] || "#78716c";
+              const color = CATEGORY_HEX[seg.cat as ExpenseCategory] || "#78716c";
               const isH   = hovered === seg.cat;
               return (
                 <path
@@ -122,15 +125,15 @@ export default function MemberCategoryChart({ memberId, memberName, expenses, cu
               );
             })}
             {/* Center label */}
-            <text x={CX} y={CY - 7} textAnchor="middle" fontSize="10" fontFamily="monospace" fontWeight="600" fill={hoveredSeg ? (CATEGORY_HEX[hoveredSeg.cat] || "#78716c") : "#4a7c59"}>
-              {hoveredSeg ? (EXPENSE_CATEGORY_META[hoveredSeg.cat]?.label || customCategories.find(c=>c.id===hoveredSeg.cat)?.label || hoveredSeg.cat) : memberName}
+            <text x={CX} y={CY - 7} textAnchor="middle" fontSize="10" fontFamily="monospace" fontWeight="600" fill={hoveredSeg ? (CATEGORY_HEX[hoveredSeg.cat as ExpenseCategory] || "#78716c") : "#4a7c59"}>
+              {hoveredSeg ? (EXPENSE_CATEGORY_META[hoveredSeg.cat as ExpenseCategory]?.label || customCategories.find(c=>c.id===hoveredSeg.cat)?.label || hoveredSeg.cat) : memberName}
             </text>
-            <text x={CX} y={CY + 9} textAnchor="middle" fontSize="12" fontFamily="monospace" fontWeight="800" fill={hoveredSeg ? (CATEGORY_HEX[hoveredSeg.cat] || "#78716c") : "#4a7c59"}>
-              {hoveredSeg ? `${(hoveredSeg.pct * 100).toFixed(1)}%` : formatBase(grandTotal, baseCurrency)}
+            <text x={CX} y={CY + 9} textAnchor="middle" fontSize="12" fontFamily="monospace" fontWeight="800" fill={hoveredSeg ? (CATEGORY_HEX[hoveredSeg.cat as ExpenseCategory] || "#78716c") : "#4a7c59"}>
+              {hoveredSeg ? `${(Number(hoveredSeg.pct) || 0 * 100).toFixed(1)}%` : formatBase(grandTotal, baseCurrency)}
             </text>
             {hoveredSeg && (
               <text x={CX} y={CY + 24} textAnchor="middle" fontSize="8.5" fontFamily="monospace" fill="#78716c">
-                {formatBase(hoveredSeg.amount, baseCurrency)}
+                {formatBase(Number(hoveredSeg.amount) || 0, baseCurrency)}
               </text>
             )}
           </svg>
@@ -143,29 +146,26 @@ export default function MemberCategoryChart({ memberId, memberName, expenses, cu
             .sort((a, b) => b.amount - a.amount)
             .map((seg) => {
               const customCat = customCategories.find(c => c.id === seg.cat);
-              const m     = EXPENSE_CATEGORY_META[seg.cat] || { label: customCat?.label || seg.cat, emoji: customCat?.emoji || "✨" };
-              const color = CATEGORY_HEX[seg.cat] || "#78716c";
+              const m     = EXPENSE_CATEGORY_META[seg.cat as ExpenseCategory] || { label: customCat?.label || seg.cat, emoji: customCat?.emoji || "✨" };
+              const color = CATEGORY_HEX[seg.cat as ExpenseCategory] || "#78716c";
               const isH   = hovered === seg.cat;
               return (
                 <div
                   key={seg.cat}
                   className={`flex items-center gap-2 border-2 px-3 py-2 transition-all cursor-pointer ${isH ? "border-stone-800 bg-[#f5eed7] shadow-[2px_2px_0_#292524] dark:border-[#54463d] dark:bg-[#362d28] dark:shadow-[2px_2px_0_#1e1815]" : "border-transparent hover:border-stone-400 hover:bg-[#f5eed7] dark:hover:border-stone-600 dark:hover:bg-[#28211d]"}`}
-                  onMouseEnter={() => setHovered(seg.cat)}
+                  onMouseEnter={() => setHovered(seg.cat as ExpenseCategory)}
                   onMouseLeave={() => setHovered(null)}
                 >
-                  <span className="text-sm">{m.emoji}</span>
                   <div className="h-2.5 w-2.5 shrink-0 border border-stone-800 dark:border-stone-900" style={{ backgroundColor: color }} />
-                  <span className="flex-1 font-mono text-xs font-semibold text-stone-800 dark:text-[#fdfbf7]">{m.label}</span>
-                  {/* Mini bar */}
-                  <div className="h-1.5 w-14 overflow-hidden border border-stone-400 bg-stone-200 dark:border-stone-700 dark:bg-[#1e1815]">
-                    <div className="h-full" style={{ width: `${seg.pct * 100}%`, backgroundColor: color, transition: "width .4s" }} />
+                  <span className="flex-1 font-mono text-xs font-semibold text-stone-800 dark:text-[#fdfbf7] truncate max-w-[100px]">
+                    {m.emoji} {m.label}
+                  </span>
+                  <div className="flex items-baseline gap-2 shrink-0">
+                    <span className="font-mono text-[10px] text-stone-500 dark:text-stone-400">{(Number(seg.pct) * 100 || 0).toFixed(1)}%</span>
+                    <span className="font-mono text-xs font-black text-stone-900 tabular-nums dark:text-[#fdfbf7]">
+                      {formatBase(seg.amount, baseCurrency)}
+                    </span>
                   </div>
-                  <span className="w-10 text-right font-mono text-xs font-bold tabular-nums" style={{ color }}>
-                    {(seg.pct * 100).toFixed(1)}%
-                  </span>
-                  <span className="w-20 text-right font-mono text-xs tabular-nums text-stone-600 dark:text-stone-400">
-                    {formatBase(seg.amount, baseCurrency)}
-                  </span>
                 </div>
               );
             })}

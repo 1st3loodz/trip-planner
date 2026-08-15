@@ -42,13 +42,13 @@ export default function ExpensePieChart({ expenses, participants }: ExpensePieCh
     const totals: Record<string, number> = {};
     for (const p of participants) totals[p.id] = 0;
     for (const exp of expenses) {
-      for (const split of exp.splits) {
+      for (const split of (exp?.splits || [])) {
         totals[split.participantId] =
-          (totals[split.participantId] ?? 0) + convertToBase(split.amount, exp.currency, rates);
+          (totals[split.participantId] ?? 0) + convertToBase(Number(split.amount) || 0, exp?.currency || baseCurrency, rates);
       }
     }
     return totals;
-  }, [expenses, participants, rates]);
+  }, [expenses, participants, rates, baseCurrency]);
 
   const grandTotal = Object.values(memberTotals).reduce((s, v) => s + v, 0);
 
@@ -56,7 +56,7 @@ export default function ExpensePieChart({ expenses, participants }: ExpensePieCh
     return participants
       .filter((p) => memberTotals[p.id] > 0)
       .reduce((acc, p) => {
-        const amount = memberTotals[p.id];
+        const amount = Number(memberTotals[p.id]) || 0;
         const pct = amount / grandTotal;
         const start = acc.length > 0 ? acc[acc.length - 1].end : 0;
         const end = start + pct * 360;
@@ -104,16 +104,18 @@ export default function ExpensePieChart({ expenses, participants }: ExpensePieCh
                 />
               );
             })}
-            <text x={CX} y={CY - 8} textAnchor="middle" fontSize="11" fontFamily="monospace" fontWeight="600" fill={hovSeg ? (MEMBER_HEX[hovSeg.id] ?? "#8b5cf6") : "#4a7c59"}>
-              {hovSeg ? hovSeg.name : `${cur.flag} ${baseCurrency}`}
+            {/* Center label */}
+            <text x={CX} y={CY - 7} textAnchor="middle" fontSize="10" fontFamily="monospace" fontWeight="600" fill={hovSeg ? (MEMBER_HEX[hovSeg.id] || "#8b5cf6") : "#4a7c59"}>
+              {hovSeg ? hovSeg.name : "Total Expenses"}
             </text>
-            <text x={CX} y={CY + 10} textAnchor="middle" fontSize="13" fontFamily="monospace" fontWeight="800" fill={hovSeg ? (MEMBER_HEX[hovSeg.id] ?? "#8b5cf6") : "#4a7c59"}>
-              {hovSeg ? `${(hovSeg.pct * 100).toFixed(1)}%` : formatBase(grandTotal, baseCurrency)}
+            <text x={CX} y={CY + 9} textAnchor="middle" fontSize="12" fontFamily="monospace" fontWeight="800" fill={hovSeg ? (MEMBER_HEX[hovSeg.id] || "#8b5cf6") : "#4a7c59"}>
+              {hovSeg ? `${(Number(hovSeg.pct) * 100 || 0).toFixed(1)}%` : formatBase(grandTotal, baseCurrency)}
             </text>
-            <text x={CX} y={CY + 26} textAnchor="middle" fontSize="9" fontFamily="monospace" fill="#78716c">
-              {hovSeg ? formatBase(hovSeg.amount, baseCurrency) : "total"}
-            </text>
-          </svg>
+            {hovSeg && (
+              <text x={CX} y={CY + 24} textAnchor="middle" fontSize="8.5" fontFamily="monospace" fill="#78716c">
+                {formatBase(hovSeg.amount, baseCurrency)}
+              </text>
+            )}</svg>
         </div>
 
         {/* Legend */}
@@ -138,8 +140,12 @@ export default function ExpensePieChart({ expenses, participants }: ExpensePieCh
                   <div className="h-1.5 w-16 overflow-hidden border border-stone-400 bg-stone-200 dark:border-stone-700 dark:bg-[#1e1815]">
                     <div className="h-full" style={{ width: `${seg.pct * 100}%`, backgroundColor: color, transition: "width .4s" }} />
                   </div>
-                  <span className="w-10 text-right font-mono text-[11px] font-bold tabular-nums" style={{ color }}>{(seg.pct * 100).toFixed(1)}%</span>
-                  <span className="w-22 text-right font-mono text-[11px] tabular-nums text-stone-600 dark:text-stone-400">{formatBase(seg.amount, baseCurrency)}</span>
+                  <div className="flex items-baseline gap-2 shrink-0">
+                    <span className="font-mono text-[10px] text-stone-500 dark:text-stone-400">{(Number(seg.pct) * 100 || 0).toFixed(1)}%</span>
+                    <span className="font-mono text-xs font-black text-stone-900 tabular-nums dark:text-[#fdfbf7]">
+                      {formatBase(seg.amount, baseCurrency)}
+                    </span>
+                  </div>
                 </div>
               );
             })}
