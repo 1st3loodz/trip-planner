@@ -82,7 +82,7 @@ export function computeSettlementsInBase(
     if (exp.isExcluded) continue;
 
     // ── 2. Guard against zero/negative amounts ───────────────────────────────
-    const expAmount = exp.amount ?? 0;
+    const expAmount = parseFloat(exp.amount as any) || 0;
     if (expAmount <= 0) continue;
 
     // ── 3. Resolve payer — fall back to first participant if missing ──────────
@@ -119,10 +119,12 @@ export function computeSettlementsInBase(
       const borrower = split.participantId;
       if (!borrower || !borrower.trim()) continue; // guard against bad participant IDs
 
+      const splitAmt = parseFloat(split.amount as any) || 0;
+      
       // Convert this split's share to base currency
       const shareBase = exp.historicalRate
-        ? split.amount * exp.historicalRate
-        : convertToBase(split.amount, exp.currency, rates);
+        ? splitAmt * exp.historicalRate
+        : convertToBase(splitAmt, exp.currency, rates);
 
       if (shareBase <= 0) continue;
 

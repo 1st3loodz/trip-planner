@@ -19,7 +19,7 @@ export default function ExpenseCard({ expense, participants, onEdit, onDelete, c
   const foundPayer = participants.find((p) => p.id === expense.paidById);
   const payer = foundPayer || { id: expense.paidById, name: (expense as any).payer?.name || (expense as any).payer?.email || 'Member', color: 'bg-stone-500 text-white' };
   const splitMembers = expense.splits.map((s) => participants.find((p) => p.id === s.participantId)).filter(Boolean) as Participant[];
-  const perPerson = expense.splits.length > 0 ? expense.amount / expense.splits.length : 0;
+  const perPerson = expense.splits.length > 0 ? (parseFloat(expense.amount as any) || 0) / expense.splits.length : 0;
   const dateLabel = expense.date ? new Date(expense.date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "";
 
   return (

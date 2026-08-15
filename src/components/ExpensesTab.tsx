@@ -67,16 +67,20 @@ export default function ExpensesTab({
   // Per-currency raw totals and their frozen base equivalents
   const rawTotals = expenses.reduce<Record<string, { total: number; baseTotal: number }>>((acc, e) => {
     if (!e.isExcluded) {
+      const amt = parseFloat(e.amount as any) || 0;
       if (!acc[e.currency]) acc[e.currency] = { total: 0, baseTotal: 0 };
-      acc[e.currency].total += e.amount;
-      acc[e.currency].baseTotal += (e.historicalBaseAmount ?? convertToBase(e.amount, e.currency, rates));
+      acc[e.currency].total += amt;
+      acc[e.currency].baseTotal += (e.historicalBaseAmount ?? convertToBase(amt, e.currency, rates));
     }
     return acc;
   }, {});
 
   // Grand total in base currency
   const grandTotalBase = useMemo(
-    () => expenses.reduce((sum, e) => sum + (e.isExcluded ? 0 : (e.historicalBaseAmount ?? convertToBase(e.amount, e.currency, rates))), 0),
+    () => expenses.reduce((sum, e) => {
+      const amt = parseFloat(e.amount as any) || 0;
+      return sum + (e.isExcluded ? 0 : (e.historicalBaseAmount ?? convertToBase(amt, e.currency, rates)));
+    }, 0),
     [expenses, rates]
   );
 
@@ -220,7 +224,10 @@ export default function ExpensesTab({
           {groupedExpenses.length > 0 ? (
             <div className="space-y-4">
               {groupedExpenses.map((group) => {
-                const dayTotal = group.expenses.reduce((sum, e) => sum + (e.isExcluded ? 0 : (e.historicalBaseAmount ?? convertToBase(e.amount, e.currency, rates))), 0);
+                const dayTotal = group.expenses.reduce((sum, e) => {
+                  const amt = parseFloat(e.amount as any) || 0;
+                  return sum + (e.isExcluded ? 0 : (e.historicalBaseAmount ?? convertToBase(amt, e.currency, rates)));
+                }, 0);
                 const isExpanded = expandedDates[group.date] ?? true;
 
                 return (

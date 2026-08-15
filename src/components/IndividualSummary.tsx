@@ -36,11 +36,13 @@ export default function IndividualSummary({ expenses, participants, customCatego
   const allGroups = useMemo<DayGroup[]>(() => {
     const map = new Map<string, LedgerEntry[]>();
     for (const exp of expenses) {
+      const expAmt = parseFloat(exp.amount as any) || 0;
       if (exp.isExcluded) {
         const split = exp.splits.find((s) => s.participantId === selectedId);
         if (exp.paidById === selectedId || split) {
           const list = map.get(exp.date) ?? [];
-          const share = exp.paidById === selectedId ? exp.amount : split!.amount;
+          const splitAmt = split ? parseFloat(split.amount as any) || 0 : 0;
+          const share = exp.paidById === selectedId ? expAmt : splitAmt;
           list.push({ expense: exp, share, isPersonal: true });
           map.set(exp.date, list);
         }
@@ -49,7 +51,8 @@ export default function IndividualSummary({ expenses, participants, customCatego
       const split = exp.splits.find((s) => s.participantId === selectedId);
       if (!split) continue;
       const list = map.get(exp.date) ?? [];
-      list.push({ expense: exp, share: split.amount, isPersonal: false });
+      const splitAmt = parseFloat(split.amount as any) || 0;
+      list.push({ expense: exp, share: splitAmt, isPersonal: false });
       map.set(exp.date, list);
     }
     return Array.from(map.entries())
