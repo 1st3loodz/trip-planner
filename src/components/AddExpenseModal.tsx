@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Participant, Currency, ExpenseCategory, Expense, CURRENCY_META, EXPENSE_CATEGORY_META } from "@/types/trip";
 import { generateId } from "@/lib/utils";
 import Avatar from "@/components/Avatar";
@@ -30,10 +30,9 @@ export default function AddExpenseModal({ participants, initialExpense, onSave, 
   const actualInitialPayer = initialExpense ? (initialExpense.paidById || (initialExpense as any).paid_by || (initialExpense as any).payer_id || (initialExpense as any).created_by || (initialExpense as any).createdBy) : undefined;
   const [paidById,    setPaidById]    = useState(actualInitialPayer ?? participants[0]?.id ?? "");
   const [dateStr,     setDateStr]     = useState(() => {
-    const d = initialExpense?.date ?? new Date().toISOString().slice(0, 10);
-    const [y, m, day] = d.split('-');
-    return `${day}/${m}/${y}`;
+    return initialExpense?.date ?? new Date().toISOString().slice(0, 10);
   });
+  const dateRef = useRef<HTMLInputElement>(null);
   const [splitIds,    setSplitIds]    = useState<Set<string>>(
     () => new Set(initialExpense ? initialExpense.splits.map((s) => s.participantId) : participants.map((p) => p.id))
   );
@@ -121,25 +120,15 @@ export default function AddExpenseModal({ participants, initialExpense, onSave, 
     });
   }
 
-  const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let val = e.target.value.replace(/[^0-9]/g, "");
-    if (val.length > 8) val = val.substring(0, 8);
-    let formatted = val;
-    if (val.length > 2) formatted = val.substring(0, 2) + "/" + val.substring(2);
-    if (val.length > 4) formatted = formatted.substring(0, 5) + "/" + val.substring(4);
-    setDateStr(formatted);
-  };
+
 
   async function handleSubmit() {
     const errs: Record<string,string> = {};
     if (!description.trim()) errs.description = "Description is required.";
     
-    let isoDate = "";
-    const parts = dateStr.split('/');
-    if (parts.length === 3 && parts[0].length === 2 && parts[1].length === 2 && parts[2].length === 4) {
-      isoDate = `${parts[2]}-${parts[1]}-${parts[0]}`;
-    } else {
-      errs.date = "Date must be DD/MM/YYYY.";
+    let isoDate = dateStr;
+    if (!isoDate || isoDate.length !== 10) {
+      errs.date = "Please select a valid date.";
     }
 
     const foreignNumSubmit = parseFloat(amount);
@@ -236,8 +225,22 @@ export default function AddExpenseModal({ participants, initialExpense, onSave, 
           {/* Date */}
           <div>
             <label className="mb-1.5 block font-pixel text-[8px] uppercase tracking-widest text-stone-600 dark:text-stone-400">Date *</label>
-            <div className="relative">
-              <input type="text" placeholder="DD/MM/YYYY" value={dateStr} onChange={handleDateChange} className={`${inputCls(errors.date)} [color-scheme:light] dark:[color-scheme:dark]`} />
+            <div
+              onClick={() => dateRef.current?.showPicker()}
+              className="relative w-full border-2 border-stone-400 bg-[#fdfbf7] cursor-pointer flex items-center px-3.5 py-2.5 gap-2 select-none dark:border-stone-600 dark:bg-[#1e1815]"
+            >
+              <span className="text-stone-500 dark:text-stone-400 shrink-0 text-sm">📅</span>
+              <span className={`font-mono text-sm flex-1 ${dateStr ? "text-stone-900 dark:text-[#fdfbf7]" : "text-stone-400 dark:text-stone-500"}`}>
+                {dateStr ? dateStr.split("-").reverse().join("/") : "dd/mm/yyyy"}
+              </span>
+              <input
+                ref={dateRef}
+                type="date"
+                value={dateStr}
+                onChange={(e) => { setDateStr(e.target.value); setErrors(p => ({...p, date: ""})); }}
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                tabIndex={-1}
+              />
             </div>
             {errors.date && <p className="mt-1 font-mono text-[10px] text-red-600 dark:text-red-400">{errors.date}</p>}
           </div>
