@@ -28,9 +28,11 @@ const COZY_CATEGORY_STYLE: Record<ActivityCategory, { bg: string; border: string
 };
 
 export default function ActivityRow({ activity, destination, isLast, onEdit, onDelete, dayNumber, tripStartDate, customCategories = [], dragHandleProps }: ActivityRowProps) {
-  const customCat = customCategories.find((c) => c.id === activity.category);
-  const meta      = ACTIVITY_CATEGORY_META[activity.category] || { label: customCat?.label || activity.category, emoji: customCat?.emoji || "✨" };
-  const cozyStyle = COZY_CATEGORY_STYLE[activity.category] || { bg: "#f3f4f6", border: "#d1d5db", text: "#374151" }; // neutral gray fallback for custom
+  const safeCategories = Array.isArray(customCategories) ? customCategories : [];
+  const customCat = safeCategories.find((c) => c && c.id === activity?.category);
+  const categoryName = activity?.category || 'free';
+  const meta      = ACTIVITY_CATEGORY_META[categoryName as ActivityCategory] || { label: customCat?.label || categoryName, emoji: customCat?.emoji || "✨" };
+  const cozyStyle = COZY_CATEGORY_STYLE[categoryName as ActivityCategory] || { bg: "#f3f4f6", border: "#d1d5db", text: "#374151" }; // neutral gray fallback for custom
 
   const destLower = destination?.toLowerCase() || "";
   const showAmap = ["china", "cn", "จีน", "beijing", "shanghai", "guangzhou", "shenzhen", "chengdu", "chongqing", "mainland"].some(str => destLower.includes(str));
@@ -83,9 +85,9 @@ export default function ActivityRow({ activity, destination, isLast, onEdit, onD
         <div className="mb-1.5 flex flex-wrap items-center gap-2">
           {/* Time — earthy monospace */}
           <span className="font-mono text-xs font-semibold tabular-nums text-stone-800 dark:text-[#fdfbf7]">
-            {activity.endTime
-              ? `${activity.time} – ${activity.endTime}`
-              : activity.time}
+            {activity?.endTime
+              ? `${activity?.time || ''} – ${activity.endTime}`
+              : activity?.time || 'No Time'}
           </span>
           {/* Category badge — muted pastel flat pill */}
           <span

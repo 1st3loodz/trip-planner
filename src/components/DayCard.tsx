@@ -92,11 +92,11 @@ export default function DayCard({ day, destination, tripStartDate, defaultOpen =
           >
             {open && (
               <div className="mt-0 px-5 py-4 bg-[#f5eed7] dark:bg-[#28211d] border-2 border-t-0 border-stone-800 dark:border-[#54463d]">
-                {day.activities.length === 0 ? (
+                {(!day?.activities || day.activities.length === 0) ? (
                   <p className="py-4 text-center font-mono text-xs text-amber-700 dark:text-amber-300">No entries yet.</p>
                 ) : (
-                  day.activities.map((act, idx) => (
-                    <Draggable key={act.id} draggableId={act.id} index={idx}>
+                  (Array.isArray(day?.activities) ? day.activities : []).map((act, idx) => (
+                    <Draggable key={act?.id || idx} draggableId={act?.id || String(idx)} index={idx}>
                       {(dragProvided, dragSnapshot) => (
                         <div
                           ref={dragProvided.innerRef}

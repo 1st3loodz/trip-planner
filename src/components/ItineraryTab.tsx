@@ -160,16 +160,17 @@ export default function ItineraryTab({ trip, onAddActivity, onEditActivity, onDe
         isFiltering ? (
           // Plain list when a category filter is active (no DnD while filtering)
           visibleDays.map((day) => (
-            <DayCard
-              key={day.dayNumber}
-              day={day}
-              destination={trip.destination}
-              tripStartDate={trip.startDate}
-              defaultOpen={false}
-              customCategories={customCategories}
-              onEditActivity={(dayNumber, activity) => setModalState({ mode: "edit", activity, dayNumber })}
-              onDeleteActivity={onDeleteActivity}
-            />
+            <ErrorBoundary key={day.id || day.dayNumber}>
+              <DayCard
+                day={day}
+                destination={trip.destination}
+                tripStartDate={trip.startDate}
+                defaultOpen={false}
+                customCategories={customCategories}
+                onEditActivity={(dayNumber, activity) => setModalState({ mode: "edit", activity, dayNumber })}
+                onDeleteActivity={onDeleteActivity}
+              />
+            </ErrorBoundary>
           ))
         ) : (
           <DragDropContext onDragEnd={handleDragEnd}>
