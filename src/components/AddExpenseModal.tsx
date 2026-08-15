@@ -112,11 +112,12 @@ export default function AddExpenseModal({ participants, initialExpense, onSave, 
       id: initialExpense?.id ?? `e-${generateId()}`,
       description: description.trim(), amount: num, currency, category, paidById, date, isExcluded,
       paid_by: paidById, // explicitly save as snake_case for backend compatibility
+      split_with: splitArray, // explicitly save array of IDs for backend compatibility
       splits: splitArray.map((id) => ({ participantId: id, amount: parseFloat(perPerson.toFixed(2)) })),
       createdAt: initialExpense?.createdAt ?? new Date().toISOString(),
       historicalRate: hRate,
       historicalBaseAmount: hBaseAmount,
-    } as Expense & { paid_by: string });
+    } as Expense & { paid_by: string; split_with: string[] });
     
     setIsSubmitting(false);
     onClose();
