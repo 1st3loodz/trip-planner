@@ -16,7 +16,8 @@ export default function ExpenseCard({ expense, participants, onEdit, onDelete, c
   const customCat = customCategories.find((c) => c.id === expense.category);
   const cat = EXPENSE_CATEGORY_META[expense.category] || { label: customCat?.label || expense.category, emoji: customCat?.emoji || "✨", color: "bg-stone-500/15 text-stone-600 border-stone-500/30 dark:text-stone-300" };
   const cur = CURRENCY_META[expense.currency];
-  const payer = participants.find((p) => p.id === expense.paidById);
+  const foundPayer = participants.find((p) => p.id === expense.paidById);
+  const payer = foundPayer || { id: expense.paidById, name: (expense as any).payer?.name || (expense as any).payer?.email || 'Member', color: 'bg-stone-500 text-white' };
   const splitMembers = expense.splits.map((s) => participants.find((p) => p.id === s.participantId)).filter(Boolean) as Participant[];
   const perPerson = expense.splits.length > 0 ? expense.amount / expense.splits.length : 0;
   const dateLabel = expense.date ? new Date(expense.date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "";

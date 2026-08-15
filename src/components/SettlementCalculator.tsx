@@ -39,9 +39,10 @@ export default function SettlementCalculator({ settlements, participants, onEdit
   useMemo(() => {
     const settledIds: string[] = [];
     settlements.forEach(s => {
-      s.involvedExpenses?.forEach(inv => {
+      s.involvedExpenses?.forEach((inv, idx) => {
+        if (!inv?.expense) return; // guard: skip if expense data is missing
         const debtorId = inv.isCredit ? s.toId : s.fromId;
-        const split = inv.expense.splits.find(sp => sp.participantId === debtorId);
+        const split = inv.expense.splits?.find(sp => sp.participantId === debtorId);
         if (split?.isSettled) settledIds.push(`${inv.expense.id}-${debtorId}`);
       });
     });
@@ -49,6 +50,7 @@ export default function SettlementCalculator({ settlements, participants, onEdit
   }, [settlements]);
 
   async function toggleSubExpenseSettled(s: Settlement, inv: NonNullable<Settlement["involvedExpenses"]>[0]) {
+    if (!inv?.expense) return; // guard: nothing to toggle if expense is missing
     const debtorId = inv.isCredit ? s.toId : s.fromId;
     const itemId = `${inv.expense.id}-${debtorId}`;
     
@@ -67,19 +69,23 @@ export default function SettlementCalculator({ settlements, participants, onEdit
     if (!isMasterChecked) {
       // Checking the group: Add all missing IDs
       setStagedSettlements(prev => {
-        const uniqueNewIds = currentSubItems.map(inv => {
-          const debtorId = inv.isCredit ? s.toId : s.fromId;
-          return `${inv.expense.id}-${debtorId}`;
-        }).filter(id => !prev.includes(id));
+        const uniqueNewIds = currentSubItems
+          .filter(inv => inv?.expense?.id)
+          .map(inv => {
+            const debtorId = inv.isCredit ? s.toId : s.fromId;
+            return `${inv.expense.id}-${debtorId}`;
+          }).filter(id => !prev.includes(id));
         return [...prev, ...uniqueNewIds];
       });
     } else {
       // Unchecking the group: Evict all IDs belonging to this group
       setStagedSettlements(prev => {
-        const toRemove = currentSubItems.map(inv => {
-          const debtorId = inv.isCredit ? s.toId : s.fromId;
-          return `${inv.expense.id}-${debtorId}`;
-        });
+        const toRemove = currentSubItems
+          .filter(inv => inv?.expense?.id)
+          .map(inv => {
+            const debtorId = inv.isCredit ? s.toId : s.fromId;
+            return `${inv.expense.id}-${debtorId}`;
+          });
         return prev.filter(id => !toRemove.includes(id));
       });
     }
@@ -88,21 +94,22 @@ export default function SettlementCalculator({ settlements, participants, onEdit
     const updates = new Map<string, Expense>();
     
     for (const inv of currentSubItems) {
+      if (!inv?.expense?.id) continue; // guard: skip malformed entries
       const debtorId = inv.isCredit ? s.toId : s.fromId;
       let expToUpdate = updates.get(inv.expense.id) || inv.expense;
       
-      const split = expToUpdate.splits.find(sp => sp.participantId === debtorId);
+      const split = expToUpdate.splits?.find(sp => sp.participantId === debtorId);
       
       if (isMasterChecked && split?.isSettled) {
         expToUpdate = {
           ...expToUpdate,
-          splits: expToUpdate.splits.map(sp => sp.participantId === debtorId ? { ...sp, isSettled: false } : sp)
+          splits: (expToUpdate.splits ?? []).map(sp => sp.participantId === debtorId ? { ...sp, isSettled: false } : sp)
         };
         updates.set(expToUpdate.id, expToUpdate);
       } else if (!isMasterChecked && !split?.isSettled) {
         expToUpdate = {
           ...expToUpdate,
-          splits: expToUpdate.splits.map(sp => sp.participantId === debtorId ? { ...sp, isSettled: true } : sp)
+          splits: (expToUpdate.splits ?? []).map(sp => sp.participantId === debtorId ? { ...sp, isSettled: true } : sp)
         };
         updates.set(expToUpdate.id, expToUpdate);
       }
@@ -245,8 +252,7 @@ export default function SettlementCalculator({ settlements, participants, onEdit
             </div>
             
             {groups.map(({ debtorId, totalDebt, list }) => {
-              const debtor = findP(debtorId);
-              if (!debtor) return null;
+              const debtor = findP(debtorId) || { id: debtorId, name: 'Unknown Member', color: 'bg-stone-500 text-white' };
               
               return (
                 <div key={debtorId} className="overflow-hidden border-2 border-stone-400 bg-[#fdfbf7] dark:border-[#54463d] dark:bg-[#28211d]">
@@ -274,8 +280,7 @@ export default function SettlementCalculator({ settlements, participants, onEdit
                   {/* Settlement rows */}
                   <div className="divide-y-2 divide-stone-200 dark:divide-[#54463d]">
                     {list.map((s, i) => {
-                      const to = findP(s.toId);
-                      if (!to) return null;
+                      const to = findP(s.toId) || { id: s.toId, name: 'Unknown Member', color: 'bg-stone-500 text-white' };
 
                       const key       = settlementKey(s);
                       const isAllSubChecked = checkIsAllSubChecked(s);
@@ -349,10 +354,19 @@ export default function SettlementCalculator({ settlements, participants, onEdit
                               </h4>
                               <div className="space-y-2.5">
                                 {s.involvedExpenses.map((inv, idx) => {
-                                  const cat = EXPENSE_CATEGORY_META[inv.expense.category];
+                                  // ── Safe category lookup (handles custom categories) ──
+                                  const cat = (inv?.expense?.category && EXPENSE_CATEGORY_META[inv.expense.category])
+                                    ? EXPENSE_CATEGORY_META[inv.expense.category]
+                                    : { emoji: "🧾", label: "Expense" };
                                   const subDebtorId = inv.isCredit ? s.toId : s.fromId;
-                                  const itemId = `${inv.expense.id}-${subDebtorId}`;
+                                  const itemId = `${inv.expense?.id ?? idx}-${subDebtorId}`;
                                   const isSubSettled = stagedSettlements.includes(itemId);
+
+                                  // ── Safe name lookups — never crash on missing participant ──
+                                  const toName    = to?.name    || "Trip Member";
+                                  const debtorName = debtor?.name || "Trip Member";
+                                  const expDesc   = inv.expense?.description || "Expense";
+                                  const expAmt    = inv.amountOwed ?? 0;
 
                                   return (
                                     <div key={idx} className={`flex items-center gap-3 font-mono text-[11px] transition-all duration-300 ${isSubSettled ? "opacity-40 grayscale" : ""}`}>
@@ -379,14 +393,16 @@ export default function SettlementCalculator({ settlements, participants, onEdit
                                       <span className="shrink-0 text-sm">{cat.emoji}</span>
                                       <div className="flex-1 min-w-0 flex flex-col">
                                         <span className={`truncate font-semibold transition-all duration-300 ${isSubSettled ? "line-through text-stone-500 dark:text-stone-600" : "text-stone-700 dark:text-[#fdfbf7]"}`}>
-                                          {inv.expense.description}
+                                          {expDesc}
                                         </span>
                                         <span className="text-[9px] text-stone-500 dark:text-stone-400">
-                                          {inv.isCredit ? `${to.name} paid, ${debtor.name} shared` : `${to.name} paid, ${debtor.name} owes`}
+                                          {inv.isCredit
+                                            ? `${toName} paid, ${debtorName} shared`
+                                            : `${toName} paid, ${debtorName} owes`}
                                         </span>
                                       </div>
                                       <span className={`shrink-0 tabular-nums font-bold transition-all duration-300 ${isSubSettled ? "line-through text-stone-400 dark:text-stone-600" : (inv.isCredit ? "text-red-700 dark:text-red-400" : "text-[#4a7c59] dark:text-[#2d5a3d]")}`}>
-                                        {formatCurrency(inv.amountOwed, s.currency)}
+                                        {formatCurrency(expAmt, s.currency)}
                                       </span>
                                     </div>
                                   );

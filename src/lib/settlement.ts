@@ -86,9 +86,10 @@ export function computeSettlementsInBase(
     if (expAmount <= 0) continue;
 
     // ── 3. Resolve payer — fall back to first participant if missing ──────────
+    const fallbackPayer = (exp as any).created_by || (exp as any).createdBy || allParticipants[0]?.id || "";
     const paidBy = (exp.paidById && exp.paidById.trim())
       ? exp.paidById
-      : allParticipants[0]?.id ?? "";
+      : fallbackPayer;
 
     // Can't do anything without a valid payer identity
     if (!paidBy) continue;
