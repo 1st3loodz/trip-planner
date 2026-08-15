@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { format } from 'date-fns';
 import { useState, useCallback, use, useEffect, useMemo } from "react";
 import { Expense, ActivityItem, Participant, Trip } from "@/types/trip";
 import { useTheme } from "@/components/ThemeProvider";
@@ -143,6 +144,16 @@ export default function TripDetailPage({ params }: { params: Promise<{ tripId: s
       return new Date(year, month, day);
     }
     return new Date(dateString);
+  }, []);
+
+  const safeFormatDate = useCallback((dateVal: any, formatStr: string = 'dd/MM/yyyy'): string => {
+    if (!dateVal) return '-';
+    try {
+      const d = typeof dateVal === 'string' ? new Date(dateVal) : dateVal;
+      return isNaN(d.getTime()) ? '-' : format(d, formatStr);
+    } catch {
+      return '-';
+    }
   }, []);
 
   const calculateTotalDays = useCallback((startStr: string, endStr: string): number => {

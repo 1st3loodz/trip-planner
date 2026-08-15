@@ -91,9 +91,9 @@ export default function ExpensesTab({
   const filtered = expenses
     .filter((e) => {
       if (!e) return false;
-      if (filterCat === "all") return true;
-      const cat = (e.category || '').toLowerCase();
-      return cat === filterCat.toLowerCase();
+      if (!filterCat || filterCat === "all") return true;
+      const topic = (e?.topic || e?.category || e?.type || '').toLowerCase();
+      return topic === filterCat.toLowerCase();
     })
     .filter((e) => {
       if (!e) return false;

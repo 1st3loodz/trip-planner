@@ -51,8 +51,8 @@ export default function ItineraryTab({ trip, onAddActivity, onEditActivity, onDe
         ...day, 
         activities: filter === "all" ? dayActivities : dayActivities.filter((a) => {
           if (!a) return false;
-          const itemType = (a.category || '').toLowerCase();
-          return itemType === filter.toLowerCase();
+          const topic = (a?.topic || a?.category || a?.type || '').toLowerCase();
+          return topic === filter.toLowerCase();
         }) 
       };
     })
