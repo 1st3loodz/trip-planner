@@ -94,6 +94,8 @@ export default function ActualLogTab({ tripId, days, tripStartDate }: ActualLogT
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [fetchError,   setFetchError]   = useState<string | null>(null);
   const [editingEntry, setEditingEntry] = useState<ActualLogEntry | null>(null);
+  // ID of the entry pending deletion confirmation
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
   // ── Day accordion state — Set of day_number values that are expanded ───────────
   const [expandedDays, setExpandedDays] = useState<Set<number>>(new Set());
@@ -416,6 +418,69 @@ export default function ActualLogTab({ tripId, days, tripStartDate }: ActualLogT
         </div>
       </div>
 
+      {/* ── Delete Confirmation Dialog ─────────────────────────────────── */}
+      {pendingDeleteId && (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center sm:items-center p-4"
+          onClick={(e) => e.target === e.currentTarget && setPendingDeleteId(null)}
+        >
+          {/* Backdrop */}
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setPendingDeleteId(null)} />
+
+          {/* Dialog panel */}
+          <div className="relative w-full max-w-sm border-4 border-stone-800 bg-[#f4ecd8] shadow-[8px_8px_0_#292524] dark:border-[#54463d] dark:bg-[#28211d] dark:shadow-[8px_8px_0_#1e1815] animate-in slide-in-from-bottom-4 sm:slide-in-from-bottom-0 fade-in duration-200">
+
+            {/* Header */}
+            <div className="flex items-center gap-3 border-b-4 border-stone-800 bg-[#e8dcc4] px-5 py-4 dark:border-[#54463d] dark:bg-[#362d28]">
+              <span className="text-xl">🗑️</span>
+              <div className="min-w-0">
+                <h2 className="font-pixel text-[11px] uppercase tracking-wider text-stone-900 dark:text-[#fdfbf7]">
+                  Delete Activity
+                </h2>
+                <p className="mt-0.5 font-mono text-[9px] text-stone-500 dark:text-stone-400">
+                  ยืนยันการลบ
+                </p>
+              </div>
+            </div>
+
+            {/* Body */}
+            <div className="px-5 py-5 space-y-1">
+              <p className="font-mono text-sm text-stone-800 dark:text-[#fdfbf7] leading-relaxed">
+                Are you sure you want to delete this log entry?
+              </p>
+              <p className="font-mono text-xs text-stone-500 dark:text-stone-400">
+                This action cannot be undone.
+              </p>
+              <p className="font-mono text-[10px] text-stone-400 dark:text-stone-500 pt-1">
+                คุณแน่ใจหรือไม่ว่าต้องการลบรายการนี้?
+              </p>
+            </div>
+
+            {/* Actions */}
+            <div className="flex gap-3 border-t-2 border-stone-300 px-5 py-4 dark:border-stone-700">
+              <button
+                type="button"
+                onClick={() => setPendingDeleteId(null)}
+                className="game-btn flex-1 border-2 border-stone-800 bg-[#fdfbf7] py-3 font-pixel text-[9px] uppercase tracking-wider text-stone-800 hover:bg-[#e8dcc4] dark:border-[#54463d] dark:bg-[#1e1815] dark:text-[#fdfbf7] dark:hover:bg-[#362d28]"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  const id = pendingDeleteId;
+                  setPendingDeleteId(null);
+                  await handleDelete(id);
+                }}
+                className="game-btn flex-1 border-2 border-red-700 bg-red-600 py-3 font-pixel text-[9px] uppercase tracking-wider text-white hover:bg-red-700 dark:border-red-800 dark:bg-red-700 dark:hover:bg-red-600"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {editingEntry && (
         <EditActualModal
           entry={editingEntry}
@@ -638,7 +703,7 @@ export default function ActualLogTab({ tripId, days, tripStartDate }: ActualLogT
                                           ✏
                                         </button>
                                         <button
-                                          onClick={() => handleDelete(entry.id)}
+                                          onClick={() => setPendingDeleteId(entry.id)}
                                           title="Delete entry"
                                           className="game-btn flex h-7 w-7 items-center justify-center font-mono text-xs bg-red-50 text-red-700 border-2 border-red-300 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800"
                                         >
