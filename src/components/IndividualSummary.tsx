@@ -249,6 +249,10 @@ export default function IndividualSummary({ expenses, participants, customCatego
                     const actualPaidById = expense.paidById || (expense as any).paid_by || (expense as any).payer_id || (expense as any).created_by || (expense as any).createdBy;
                     const isPayer  = actualPaidById === selectedId;
                     const baseAmt  = convertToBase(share, expense.currency, rates);
+                    
+                    const expBaseAmt = expense.historicalBaseAmount ?? convertToBase(expense.amount, expense.currency, rates);
+                    const owedBase = isPayer ? Math.max(0, expBaseAmt - baseAmt) : 0;
+                    
                     return (
                       <div key={expense.id} className="flex items-center gap-3 px-4 py-3">
                         <span className="text-base shrink-0">{cat.emoji}</span>
@@ -257,13 +261,16 @@ export default function IndividualSummary({ expenses, participants, customCatego
                           <p className="truncate font-mono text-xs font-medium text-stone-800 dark:text-[#fdfbf7]">
                             {expense.description}
                           </p>
-                          <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
+                          <p className="font-mono text-[9px] text-stone-500 mt-0.5 tabular-nums">
+                            Total Bill: {formatBase(expBaseAmt, baseCurrency)} (Your share: {formatBase(baseAmt, baseCurrency)})
+                          </p>
+                          <div className="flex flex-wrap items-center gap-1.5 mt-1">
                             <span className={`text-[10px] border px-1.5 py-px font-mono font-semibold ${cat.color} text-stone-800`}>
                               {cat.label}
                             </span>
                             {isPayer && !isPersonal && (
-                              <span className="border border-stone-400 bg-stone-200 px-1.5 py-px font-mono text-[10px] font-semibold text-stone-800 dark:border-[#54463d] dark:bg-[#1e1815] dark:text-stone-300">
-                                💳 ผู้จ่าย
+                              <span className="border border-stone-400 bg-stone-200 px-1.5 py-px font-mono text-[9px] font-semibold text-stone-800 dark:border-[#54463d] dark:bg-[#1e1815] dark:text-stone-300">
+                                💳 You Paid • Owed {formatBase(owedBase, baseCurrency)}
                               </span>
                             )}
                             {isPersonal && (
