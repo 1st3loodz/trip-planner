@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { ActualLogEntry } from "./ActualLogTab";
-import { DayPlan, CandidateLocation } from "@/types/trip";
+import { DayPlan } from "@/types/trip";
 
 interface EditActualModalProps {
   entry: ActualLogEntry;
@@ -31,10 +31,7 @@ export default function EditActualModal({ entry, days, onSave, onClose }: EditAc
   const [dayNumber, setDayNumber] = useState<number>(entry.day_number);
   const [fromTime, setFromTime] = useState<string>(entry.from_time ?? "");
   const [toTime, setToTime] = useState<string>(entry.to_time ?? "");
-  
-  const [details, setDetails] = useState<string>(entry.title || entry.details || "");
-  const [remarks, setRemarks] = useState<string>(entry.remarks || (!entry.title ? entry.details : "") || "");
-  const [locations, setLocations] = useState<CandidateLocation[]>(entry.locations || []);
+  const [details, setDetails] = useState<string>(entry.details ?? "");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
 
@@ -44,23 +41,9 @@ export default function EditActualModal({ entry, days, onSave, onClose }: EditAc
     return () => window.removeEventListener("keydown", h);
   }, [onClose]);
 
-  function addLocation() {
-    setLocations([...locations, { name: "", map_url: "" }]);
-  }
-
-  function updateLocation(index: number, field: keyof CandidateLocation, value: string) {
-    const newLocs = [...locations];
-    newLocs[index] = { ...newLocs[index], [field]: value };
-    setLocations(newLocs);
-  }
-
-  function removeLocation(index: number) {
-    setLocations(locations.filter((_, i) => i !== index));
-  }
-
   async function handleSubmit() {
     if (!details.trim()) {
-      setError("Activity Title / Details cannot be empty.");
+      setError("Details cannot be empty.");
       return;
     }
     setError("");
@@ -70,10 +53,7 @@ export default function EditActualModal({ entry, days, onSave, onClose }: EditAc
         day_number: dayNumber,
         from_time: fromTime.trim() || null,
         to_time: toTime.trim() || null,
-        title: details.trim(), 
-        details: details.trim(), // fallback for older clients
-        remarks: remarks.trim() || null as any,
-        locations: locations.filter(l => l.name.trim()),
+        details: details.trim(),
       });
       onClose();
     } catch (err: unknown) {
@@ -122,33 +102,8 @@ export default function EditActualModal({ entry, days, onSave, onClose }: EditAc
           </div>
 
           <div>
-            <label className="mb-1.5 block font-pixel text-[8px] uppercase tracking-widest text-stone-600 dark:text-stone-400">Activity / Place Title</label>
-            <input type="text" value={details} onChange={(e) => setDetails(e.target.value)} className={INPUT} placeholder="What did you do?" />
-          </div>
-
-          <div>
-            <label className="mb-2 block font-pixel text-[8px] uppercase tracking-widest text-stone-600 dark:text-stone-400">📍 Candidate / Visited Locations</label>
-            <div className="space-y-2">
-              {locations.map((loc, idx) => (
-                <div key={idx} className="flex gap-2 items-start border-2 border-stone-300 dark:border-stone-600 bg-[#fdfbf7] dark:bg-[#1e1815] px-2.5 py-2">
-                  <div className="flex-1 space-y-1.5 min-w-0">
-                    <input type="text" placeholder={`Location ${idx + 1} name`} value={loc.name} onChange={(e) => updateLocation(idx, "name", e.target.value)} className={INPUT} />
-                    <input type="url" placeholder="Google Maps URL" value={loc.map_url ?? ""} onChange={(e) => updateLocation(idx, "map_url", e.target.value)} className="w-full border-2 border-stone-300 bg-[#f5f5f0] px-3 py-1.5 font-mono text-[11px] text-stone-700 placeholder-stone-400 outline-none focus:border-stone-600 dark:border-stone-700 dark:bg-[#28211d] dark:text-[#f5ebd5] dark:placeholder-stone-600" />
-                  </div>
-                  <button type="button" onClick={() => removeLocation(idx)} className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center border-2 border-red-300 bg-red-50 text-red-600 hover:bg-red-100 dark:border-red-800 dark:bg-red-900/30 dark:text-red-400 dark:hover:bg-red-900/50">
-                    🗑
-                  </button>
-                </div>
-              ))}
-            </div>
-            <button type="button" onClick={addLocation} className="mt-2 flex w-full items-center justify-center gap-2 border-2 border-dashed border-stone-400 py-2 font-mono text-[11px] text-stone-600 hover:border-stone-600 hover:bg-[#f0e8d4] dark:border-stone-600 dark:text-stone-400 dark:hover:border-[#54463d]">
-              ＋ Add Location
-            </button>
-          </div>
-
-          <div>
-            <label className="mb-1.5 block font-pixel text-[8px] uppercase tracking-widest text-stone-600 dark:text-stone-400">Remarks / Notes</label>
-            <textarea rows={3} value={remarks} onChange={(e) => setRemarks(e.target.value)} className={`${INPUT} resize-none`} placeholder="Any extra notes?" />
+            <label className="mb-1.5 block font-pixel text-[8px] uppercase tracking-widest text-stone-600 dark:text-stone-400">What Actually Happened? *</label>
+            <textarea rows={4} value={details} onChange={(e) => setDetails(e.target.value)} className={`${INPUT} resize-none`} placeholder="e.g. Missed the train, grabbed local ramen instead..." />
           </div>
 
           {error && <p className="font-mono text-[10px] text-red-600 dark:text-red-400">{error}</p>}

@@ -8,9 +8,6 @@ import EditActualModal from "./EditActualModal";
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
 export interface ActualLogEntry {
-  title?: string;
-  remarks?: string;
-  locations?: any[];
   id: string;
   trip_id: string;
   day_number: number;
@@ -121,7 +118,7 @@ export default function ActualLogTab({ tripId, days }: ActualLogTabProps) {
       const sb = createClient();
       const { data, error } = await sb
         .from("actual_logs")
-        .select("id, trip_id, day_number, from_time, to_time, details, title, locations, remarks, created_at")
+        .select("id, trip_id, day_number, from_time, to_time, details, created_at")
         .eq("trip_id", tripId)
         .order("day_number", { ascending: true })
         .order("from_time",  { ascending: true, nullsFirst: true });
@@ -178,7 +175,7 @@ export default function ActualLogTab({ tripId, days }: ActualLogTabProps) {
       const { data, error } = await sb
         .from("actual_logs")
         .insert([payload])
-        .select("id, trip_id, day_number, from_time, to_time, details, title, locations, remarks, created_at")
+        .select("id, trip_id, day_number, from_time, to_time, details, created_at")
         .single();
 
       if (error) {
@@ -517,47 +514,9 @@ export default function ActualLogTab({ tripId, days }: ActualLogTabProps) {
                             </span>
                           </div>
                           {/* Details text */}
-                          <div className="space-y-1.5">
-                            <h4 className="font-mono text-sm font-semibold leading-relaxed text-stone-800 dark:text-[#fdfbf7]">
-                              {entry.title || entry.details}
-                            </h4>
-                            
-                            {/* Locations */}
-                            {entry.locations && entry.locations.length > 0 && (
-                              <div className="space-y-1">
-                                {entry.locations.map((loc, i) => {
-                                  const googleUrl = loc.map_url && loc.map_url.trim().startsWith("http")
-                                    ? loc.map_url
-                                    : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(loc.name)}`;
-                                  return (
-                                    <div key={i} className="flex items-start gap-1.5">
-                                      <span className="mt-px text-[10px] shrink-0">📍</span>
-                                      <div className="min-w-0 flex flex-wrap gap-1.5 items-center">
-                                        <span className="font-mono text-[10px] text-stone-600 dark:text-[#f5ebd5]">
-                                          {loc.name}
-                                        </span>
-                                        <a
-                                          href={googleUrl}
-                                          target="_blank"
-                                          rel="noopener noreferrer"
-                                          className="game-btn flex items-center gap-1 border-2 border-stone-800 bg-[#fdfbf7] px-1.5 py-0.5 font-pixel text-[6px] uppercase tracking-wider text-stone-800 hover:bg-[#e8dcc4] dark:border-[#54463d] dark:bg-[#1e1815] dark:text-[#fdfbf7] dark:hover:bg-[#362d28]"
-                                        >
-                                          🗺 Maps
-                                        </a>
-                                      </div>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            )}
-
-                            {/* Remarks */}
-                            {entry.remarks && (
-                              <p className="font-mono text-[11px] leading-relaxed text-stone-500 dark:text-stone-400 border-l-2 border-stone-300 dark:border-stone-600 pl-2">
-                                {entry.remarks}
-                              </p>
-                            )}
-                          </div>
+                          <p className="font-mono text-sm leading-relaxed text-stone-800 dark:text-[#fdfbf7]">
+                            {entry.details}
+                          </p>
                         </div>
 
                         {/* Delete — hover-reveal */}
@@ -591,4 +550,5 @@ export default function ActualLogTab({ tripId, days }: ActualLogTabProps) {
     </div>
   );
 }
+
 
