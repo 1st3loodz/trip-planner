@@ -7,10 +7,11 @@ import { Rates, convertToBase } from "@/lib/currency";
  */
 export function computeSettlements(expenses: Expense[]): Settlement[] {
   const balances: Record<Currency, Record<string, number>> = {
-    THB: {}, JPY: {}, CNY: {}, USD: {},
+    THB: {}, JPY: {}, CNY: {}, USD: {}, KZT: {},
   };
 
   for (const exp of expenses) {
+    if (exp.isExcluded) continue;
     const cur = exp.currency;
     balances[cur][exp.paidById] = (balances[cur][exp.paidById] ?? 0) + exp.amount;
     for (const split of exp.splits) {
@@ -43,44 +44,98 @@ export function computeSettlements(expenses: Expense[]): Settlement[] {
 /**
  * Base-currency settlement — converts all amounts to a single base currency,
  * then runs the greedy simplification. Returns settlements in base currency.
+ *
+ * FIX LOG:
+ * - Skips isExcluded expenses from balance math (they shouldn't create debt)
+ * - Skips self-splits correctly (payer's own share)
+ * - Guards against empty splits arrays (expense is silently skipped rather than crashing)
+ * - Logs any expense that produces no pairwise entry (debugging aid)
  */
 export function computeSettlementsInBase(
   expenses: Expense[],
   rates: Rates,
   baseCurrency: Currency
 ): Settlement[] {
-  // pairwise balances: what borrower owes to payer
+  // pairwise[borrower][payer] = net base-currency amount borrower owes payer (unsettled only)
   const pairwise: Record<string, Record<string, number>> = {};
-  // keep track of specific expenses: what borrower owes to payer
-  const pairExpenses: Record<string, Record<string, { exp: Expense, amt: number }[]>> = {};
+  // pairExpenses[borrower][payer] = list of expense + amt entries (ALL — including settled, for breakdown display)
+  const pairExpenses: Record<string, Record<string, { exp: Expense; amt: number }[]>> = {};
+
+  // Diagnostic counters
+  let processedCount = 0;
+  let skippedExcluded = 0;
+  let skippedNoSplits = 0;
+  let skippedSelfOnly = 0;
 
   for (const exp of expenses) {
-    if (exp.isExcluded) continue;
+    // ── Guard: skip expenses marked as personal/excluded ──────────────────
+    if (exp.isExcluded) {
+      skippedExcluded++;
+      continue;
+    }
+
+    // ── Guard: skip expenses with no splits (shouldn't happen but be safe) ─
+    if (!exp.splits || exp.splits.length === 0) {
+      skippedNoSplits++;
+      console.warn(
+        `[settlement] Expense "${exp.description}" (${exp.id}) has NO splits — skipped from settlement.`
+      );
+      continue;
+    }
 
     const paidBy = exp.paidById;
+
+    // Count how many non-self splits this expense has
+    const nonSelfSplits = exp.splits.filter(s => s.participantId !== paidBy);
+
+    if (nonSelfSplits.length === 0) {
+      // Payer paid for themselves only — no inter-person debt generated
+      skippedSelfOnly++;
+      console.info(
+        `[settlement] Expense "${exp.description}" (${exp.id}) has only self-splits — no debt generated.`
+      );
+      continue;
+    }
+
+    processedCount++;
+
     for (const split of exp.splits) {
+      // Skip payer's own share — payer doesn't owe themselves
       if (split.participantId === paidBy) continue;
+
       const borrower = split.participantId;
-      const shareBase = exp.historicalRate 
-        ? split.amount * exp.historicalRate 
+
+      // Convert share to base currency using frozen historical rate when available,
+      // else use current live rate
+      const shareBase = exp.historicalRate
+        ? split.amount * exp.historicalRate
         : convertToBase(split.amount, exp.currency, rates);
 
+      // ── Pairwise balance (unsettled only — drives the "amount owed" number) ──
       if (!split.isSettled) {
         pairwise[borrower] ??= {};
         pairwise[borrower][paidBy] = (pairwise[borrower][paidBy] ?? 0) + shareBase;
       }
 
+      // ── Full expense list (always tracked — drives the accordion breakdown) ──
       pairExpenses[borrower] ??= {};
       pairExpenses[borrower][paidBy] ??= [];
       pairExpenses[borrower][paidBy].push({ exp, amt: shareBase });
     }
   }
 
-  // Get unique participants from pairwise tracking
+  console.info(
+    `[settlement] Processed ${processedCount} expenses. ` +
+    `Skipped: ${skippedExcluded} excluded, ${skippedNoSplits} no-splits, ${skippedSelfOnly} self-only.`
+  );
+
+  // ── Collect all participant IDs seen across all pairExpenses ──────────────
   const pIds = new Set<string>();
-  for (const b of Object.keys(pairExpenses)) {
-    pIds.add(b);
-    for (const p of Object.keys(pairExpenses[b])) pIds.add(p);
+  for (const borrower of Object.keys(pairExpenses)) {
+    pIds.add(borrower);
+    for (const payer of Object.keys(pairExpenses[borrower])) {
+      pIds.add(payer);
+    }
   }
   const participants = Array.from(pIds);
 
@@ -97,47 +152,61 @@ export function computeSettlementsInBase(
       const p1OwesP2 = pairwise[p1]?.[p2] ?? 0;
       const p2OwesP1 = pairwise[p2]?.[p1] ?? 0;
       const net = p1OwesP2 - p2OwesP1;
-      
-      const debtsP1 = pairExpenses[p1]?.[p2] ?? [];
+
+      const debtsP1   = pairExpenses[p1]?.[p2] ?? [];
       const creditsP1 = pairExpenses[p2]?.[p1] ?? [];
 
-      if (Math.abs(net) > 0.5 || debtsP1.length > 0 || creditsP1.length > 0) {
-        // Calculate historic net to lock the row direction
-        const histP1OwesP2 = debtsP1.reduce((sum, e) => sum + e.amt, 0);
-        const histP2OwesP1 = creditsP1.reduce((sum, e) => sum + e.amt, 0);
-        const historicNet = histP1OwesP2 - histP2OwesP1;
+      // Only create a settlement row if there are actual expense relationships
+      if (debtsP1.length === 0 && creditsP1.length === 0) continue;
 
-        const fromId = historicNet >= 0 ? p1 : p2;
-        const toId   = historicNet >= 0 ? p2 : p1;
-        
-        // Floor the active net debt to 0 to prevent negative flips
-        const activeNet = fromId === p1 ? net : -net;
-        const activeDebtFloored = Math.max(0, activeNet);
-        
-        const involvedExpenses = [];
-        // Expenses where fromId owes toId (positive debt contribution)
-        const debts = pairExpenses[fromId]?.[toId] ?? [];
-        for (const d of debts) {
-          involvedExpenses.push({ expense: d.exp, amountOwed: d.amt, isCredit: false });
-        }
-        // Expenses where toId owes fromId (credit contribution, offsets debt)
-        const credits = pairExpenses[toId]?.[fromId] ?? [];
-        for (const c of credits) {
-          involvedExpenses.push({ expense: c.exp, amountOwed: c.amt, isCredit: true });
-        }
+      // Historic net (sum of ALL expense shares in both directions, ignoring settled flag)
+      // This determines the canonical "from → to" direction so settled items don't flip the arrow
+      const histP1OwesP2 = debtsP1.reduce((sum, e) => sum + e.amt, 0);
+      const histP2OwesP1 = creditsP1.reduce((sum, e) => sum + e.amt, 0);
+      const historicNet  = histP1OwesP2 - histP2OwesP1;
 
-        // Sort by date or created at
-        involvedExpenses.sort((a, b) => a.expense.date.localeCompare(b.expense.date));
+      const fromId = historicNet >= 0 ? p1 : p2;
+      const toId   = historicNet >= 0 ? p2 : p1;
 
-        settlements.push({
-          fromId,
-          toId,
-          amount: Math.round(activeDebtFloored),
-          historicAmount: Math.round(Math.abs(historicNet)),
-          currency: baseCurrency,
-          involvedExpenses,
-        });
+      // Active net debt — floor to 0 to avoid negative-flipped arrows when everything is settled
+      const activeNet         = fromId === p1 ? net : -net;
+      const activeDebtFloored = Math.max(0, activeNet);
+
+      // Build the accordion breakdown list
+      const involvedExpenses: NonNullable<Settlement["involvedExpenses"]> = [];
+
+      // Expenses where fromId owes toId (positive debt contribution → isCredit: false)
+      const debts = pairExpenses[fromId]?.[toId] ?? [];
+      for (const d of debts) {
+        involvedExpenses.push({ expense: d.exp, amountOwed: d.amt, isCredit: false });
       }
+      // Expenses where toId owes fromId (credit → reduces debt → isCredit: true)
+      const credits = pairExpenses[toId]?.[fromId] ?? [];
+      for (const c of credits) {
+        involvedExpenses.push({ expense: c.exp, amountOwed: c.amt, isCredit: true });
+      }
+
+      // Sort by expense date, then by createdAt for same-day stability
+      involvedExpenses.sort((a, b) => {
+        const dateComp = a.expense.date.localeCompare(b.expense.date);
+        return dateComp !== 0 ? dateComp : a.expense.createdAt.localeCompare(b.expense.createdAt);
+      });
+
+      console.info(
+        `[settlement] ${fromId} → ${toId}: ` +
+        `active=฿${activeDebtFloored.toFixed(0)}, ` +
+        `historic=฿${Math.abs(historicNet).toFixed(0)}, ` +
+        `${involvedExpenses.length} expense(s) in breakdown`
+      );
+
+      settlements.push({
+        fromId,
+        toId,
+        amount: Math.round(activeDebtFloored),
+        historicAmount: Math.round(Math.abs(historicNet)),
+        currency: baseCurrency,
+        involvedExpenses,
+      });
     }
   }
 
