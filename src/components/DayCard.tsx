@@ -107,6 +107,8 @@ export default function DayCard({ day, destination, defaultOpen = true, dragHand
                             activity={act}
                             destination={destination}
                             isLast={idx === day.activities.length - 1 && !dragSnapshot.isDragging}
+                            dayNumber={day.dayNumber}
+                            date={day.date}
                             customCategories={customCategories}
                             onEdit={(a) => onEditActivity(day.dayNumber, a)}
                             onDelete={(id) => onDeleteActivity(day.dayNumber, id)}

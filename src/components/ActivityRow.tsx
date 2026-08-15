@@ -1,7 +1,7 @@
 "use client";
 
 import { ActivityItem, ActivityCategory } from "@/types/trip";
-import { ACTIVITY_CATEGORY_META } from "@/lib/utils";
+import { ACTIVITY_CATEGORY_META, formatDate } from "@/lib/utils";
 import { DraggableProvidedDragHandleProps } from "@hello-pangea/dnd";
 
 interface ActivityRowProps {
@@ -10,6 +10,8 @@ interface ActivityRowProps {
   isLast: boolean;
   onEdit: (activity: ActivityItem) => void;
   onDelete: (id: string) => void;
+  dayNumber: number;
+  date: string;
   customCategories?: { id: string; label: string; emoji: string }[];
   dragHandleProps?: DraggableProvidedDragHandleProps | null;
 }
@@ -25,7 +27,7 @@ const COZY_CATEGORY_STYLE: Record<ActivityCategory, { bg: string; border: string
   shopping:    { bg: "#fce7f3", border: "#f9a8d4", text: "#9d174d" }, // soft blush
 };
 
-export default function ActivityRow({ activity, destination, isLast, onEdit, onDelete, customCategories = [], dragHandleProps }: ActivityRowProps) {
+export default function ActivityRow({ activity, destination, isLast, onEdit, onDelete, dayNumber, date, customCategories = [], dragHandleProps }: ActivityRowProps) {
   const customCat = customCategories.find((c) => c.id === activity.category);
   const meta      = ACTIVITY_CATEGORY_META[activity.category] || { label: customCat?.label || activity.category, emoji: customCat?.emoji || "✨" };
   const cozyStyle = COZY_CATEGORY_STYLE[activity.category] || { bg: "#f3f4f6", border: "#d1d5db", text: "#374151" }; // neutral gray fallback for custom
@@ -91,6 +93,10 @@ export default function ActivityRow({ activity, destination, isLast, onEdit, onD
             }}
           >
             {meta.label}
+          </span>
+          {/* Day/Date badge */}
+          <span className="font-mono text-[9px] px-2 py-0.5 text-stone-500 border border-stone-300 dark:border-stone-600 rounded bg-[#f5eed7]/50 dark:bg-[#362d28]/50">
+            Day {dayNumber} ({formatDate(date)})
           </span>
         </div>
 
