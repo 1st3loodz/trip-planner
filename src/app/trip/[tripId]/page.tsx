@@ -45,6 +45,7 @@ export default function TripDetailPage({ params }: { params: Promise<{ tripId: s
   const [showMembersModal,   setShowMembersModal]   = useState(false);
   const [refreshToggle,      setRefreshToggle]      = useState(0);
   const [activityToDelete,   setActivityToDelete]   = useState<{dayNumber: number; activityId: string; title: string} | null>(null);
+  const [selectedExpenseDetail, setSelectedExpenseDetail] = useState<any | null>(null);
 
   // Keep localTrip synced whenever context mutates (e.g. after updateTrip resolves)
   useEffect(() => {
@@ -569,6 +570,44 @@ export default function TripDetailPage({ params }: { params: Promise<{ tripId: s
                       );
                     })}
                   </div>
+
+                  {/* Expense Breakdown List */}
+                  <div className="bg-white rounded-2xl p-5 border shadow-sm mt-6">
+                    <h4 className="font-semibold text-gray-800 text-sm mb-3">📋 รายการค่าใช้จ่ายทั้งหมด ({expenses.length} รายการ)</h4>
+                    <div className="space-y-2">
+                      {expenses.map((expense: any) => {
+                        const payer = members?.find(m => String(m.id).trim() === String(expense.paid_by || expense.paidById || expense.payer_id || '').trim())?.name || 'Unknown';
+                        const thbAmt = toTHB(expense);
+                        const isForeign = expense.currency && expense.currency !== 'THB';
+                        const splitCount = Array.isArray(expense.split_members || expense.splits) ? (expense.split_members || expense.splits).length : 1;
+
+                        return (
+                          <div
+                            key={expense.id}
+                            onClick={() => setSelectedExpenseDetail(expense)}
+                            className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100 hover:bg-gray-100 cursor-pointer transition-colors"
+                          >
+                            <div className="flex flex-col">
+                              <span className="font-semibold text-gray-800 text-sm">{expense.title || expense.description || 'Expense'}</span>
+                              <span className="text-xs text-gray-500">
+                                จ่ายโดย {payer} • หาร {splitCount} คน
+                              </span>
+                            </div>
+                            <div className="flex flex-col items-end">
+                              <span className="font-bold text-gray-900">
+                                ฿{thbAmt.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                              </span>
+                              {isForeign && (
+                                <span className="text-[10px] text-gray-400">
+                                  {Number(expense.foreign_amount || expense.foreignAmount || expense.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })} {expense.currency}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
                 </div>
               );
             })()}
@@ -598,6 +637,106 @@ export default function TripDetailPage({ params }: { params: Promise<{ tripId: s
           onConfirm={executeDeleteActivity}
           onCancel={() => setActivityToDelete(null)}
         />
+      )}
+
+      {/* Expense Detail Modal */}
+      {selectedExpenseDetail && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
+          onClick={() => setSelectedExpenseDetail(null)}
+        >
+          <div 
+            className="bg-white rounded-2xl p-5 w-full max-w-sm shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="font-bold text-gray-900 text-lg">{selectedExpenseDetail.title || selectedExpenseDetail.description || 'Expense'}</h3>
+              <button 
+                onClick={() => setSelectedExpenseDetail(null)}
+                className="text-gray-400 hover:text-gray-600 text-lg p-1"
+              >
+                ✕
+              </button>
+            </div>
+            
+            <div className="mb-4">
+              <p className="text-sm text-gray-500 mb-1">ยอดจัดเก็บ</p>
+              <div className="flex items-baseline gap-2">
+                <span className="text-2xl font-bold text-gray-900">
+                  {(() => {
+                    const toTHB = (e: any): number => {
+                      if (!e) return 0;
+                      if (e.currency === 'THB' || !e.currency) return Number(e.amount) || 0;
+                      const rate = Number(e.custom_exchange_rate) > 0 
+                        ? Number(e.custom_exchange_rate) 
+                        : (Number(e.exchange_rate) > 0 && Number(e.exchange_rate) !== 1 ? Number(e.exchange_rate) : 0.209096);
+                      const raw = Number(e.foreign_amount) > 0 ? Number(e.foreign_amount) : (Number(e.amount) || 0);
+                      return raw * rate;
+                    };
+                    return `฿${toTHB(selectedExpenseDetail).toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+                  })()}
+                </span>
+                {selectedExpenseDetail.currency && selectedExpenseDetail.currency !== 'THB' && (
+                  <span className="text-xs text-gray-500">
+                    ({Number(selectedExpenseDetail.foreign_amount || selectedExpenseDetail.foreignAmount || selectedExpenseDetail.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })} {selectedExpenseDetail.currency})
+                  </span>
+                )}
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 mb-4 p-3 bg-gray-50 rounded-xl border border-gray-100">
+              <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-sm">
+                {(() => {
+                  const name = trip.participants.find(m => String(m.id).trim() === String(selectedExpenseDetail.paid_by || selectedExpenseDetail.paidById || selectedExpenseDetail.payer_id || '').trim())?.name || 'U';
+                  return name.charAt(0).toUpperCase();
+                })()}
+              </div>
+              <div className="flex flex-col">
+                <span className="text-[10px] text-gray-500 uppercase tracking-wider">Paid By</span>
+                <span className="text-sm font-semibold text-gray-800">
+                  {trip.participants.find(m => String(m.id).trim() === String(selectedExpenseDetail.paid_by || selectedExpenseDetail.paidById || selectedExpenseDetail.payer_id || '').trim())?.name || 'Unknown'}
+                </span>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Split Breakdown</h4>
+              {(selectedExpenseDetail.split_members || selectedExpenseDetail.splits || []).map((split: any, idx: number) => {
+                const memberId = String(split.participantId || split.id || split).trim();
+                const memberName = trip.participants.find(m => String(m.id).trim() === memberId)?.name || 'Member';
+                
+                let amt = 0;
+                if (typeof split === 'object' && split.amount !== undefined) {
+                  const rate = (selectedExpenseDetail.currency !== 'THB' && selectedExpenseDetail.currency) 
+                    ? (Number(selectedExpenseDetail.custom_exchange_rate) || Number(selectedExpenseDetail.exchange_rate) || 0.209096) 
+                    : 1;
+                  amt = Number(split.amount) * rate;
+                } else {
+                  const splitsLen = (selectedExpenseDetail.split_members || selectedExpenseDetail.splits || []).length || 1;
+                  const toTHB = (e: any): number => {
+                    if (!e) return 0;
+                    if (e.currency === 'THB' || !e.currency) return Number(e.amount) || 0;
+                    const rate = Number(e.custom_exchange_rate) > 0 
+                      ? Number(e.custom_exchange_rate) 
+                      : (Number(e.exchange_rate) > 0 && Number(e.exchange_rate) !== 1 ? Number(e.exchange_rate) : 0.209096);
+                    const raw = Number(e.foreign_amount) > 0 ? Number(e.foreign_amount) : (Number(e.amount) || 0);
+                    return raw * rate;
+                  };
+                  amt = toTHB(selectedExpenseDetail) / splitsLen;
+                }
+
+                return (
+                  <div key={idx} className="flex justify-between items-center py-2 border-b border-gray-50 last:border-0">
+                    <span className="text-sm text-gray-700">{memberName}</span>
+                    <span className="text-sm font-semibold text-gray-900">
+                      ฿{amt.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
       )}
     </main>
   );
