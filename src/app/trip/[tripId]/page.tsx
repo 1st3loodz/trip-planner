@@ -347,6 +347,47 @@ export default function TripDetailPage({ params }: { params: Promise<{ tripId: s
     await updateTrip(trip.id, { days: newDays });
   }, [trip, updateTrip, setLocalTrip]);
 
+  const toggleParticipantSettled = async (expenseId: string, participantId: string, currentStatus: boolean) => {
+    if (!trip) return;
+    try {
+      const expense: any = trip.expenses.find((e: any) => e.id === expenseId);
+      if (!expense) return;
+      const splitsArray = expense.split_members || expense.splits || [];
+      if (!Array.isArray(splitsArray)) return;
+
+      const updatedSplits = splitsArray.map((s: any) => {
+        const sId = String(s?.participantId || s?.id || s).trim();
+        if (sId === participantId) {
+          return {
+            ...(typeof s === 'object' ? s : { participantId: sId }),
+            isSettled: !currentStatus,
+          };
+        }
+        return s;
+      });
+
+      // Update in Supabase
+      const supabase = createClient();
+      const { error } = await supabase
+        .from('expenses')
+        .update({ split_members: updatedSplits, splits: updatedSplits })
+        .eq('id', expenseId);
+
+      if (error) throw error;
+
+      // Optimistic UI state update
+      setLocalTrip((prev: any) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          expenses: prev.expenses.map((e: any) => e.id === expenseId ? { ...e, split_members: updatedSplits, splits: updatedSplits } : e)
+        };
+      });
+    } catch (err) {
+      console.error("Error toggling settle status:", err);
+    }
+  };
+
   if (!isLoaded) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#f4ecd8] dark:bg-[#28211d]">
@@ -470,13 +511,31 @@ export default function TripDetailPage({ params }: { params: Promise<{ tripId: s
                 // Paid
                 const totalPaid = (expenses || [])
                   .filter((e: any) => String(e.paid_by || e.paidById || e.payer_id || '').trim() === mId)
-                  .reduce((sum, e) => sum + toTHB(e), 0);
+                  .reduce((sum, e: any) => {
+                    const baseAmt = toTHB(e);
+                    const splits = Array.isArray(e.split_members) ? e.split_members : (Array.isArray(e.splits) ? e.splits : []);
+                    let settledTotal = 0;
+                    splits.forEach((s: any) => {
+                      if (s.isSettled && String(s?.participantId || s?.id || s).trim() !== mId) {
+                        if (typeof s === 'object' && s.amount !== undefined) {
+                          const rate = (e.currency !== 'THB' && e.currency) 
+                            ? (Number(e.custom_exchange_rate) || Number(e.exchange_rate) || 0.209096) 
+                            : 1;
+                          settledTotal += Number(s.amount) * rate;
+                        } else {
+                          settledTotal += baseAmt / (splits.length || 1);
+                        }
+                      }
+                    });
+                    return sum + (baseAmt - settledTotal);
+                  }, 0);
 
                 // Share
                 const totalShare = (expenses || []).reduce((sum, e: any) => {
                   const splits = Array.isArray(e.split_members) ? e.split_members : (Array.isArray(e.splits) ? e.splits : []);
                   const mySplit = splits.find((s: any) => String(s?.participantId || s?.id || s).trim() === mId);
-                  if (!mySplit) return sum;
+                  
+                  if (!mySplit || mySplit.isSettled) return sum;
 
                   if (typeof mySplit === 'object' && mySplit.amount !== undefined) {
                     const rate = (e.currency !== 'THB' && e.currency) 
@@ -856,15 +915,39 @@ export default function TripDetailPage({ params }: { params: Promise<{ tripId: s
                       <p className="text-xs text-gray-400 italic px-2">ไม่มีรายการที่ต้องหาร</p>
                     ) : (
                       <div className="space-y-2">
-                        {sharedExpenses.map(({ expense, shareAmt }: { expense: any; shareAmt: number }) => (
+                        {sharedExpenses.map(({ expense, shareAmt }: { expense: any; shareAmt: number }) => {
+                          const split = (expense.split_members || expense.splits).find((s: any) => String(s?.participantId || s?.id || s).trim() === mId);
+                          const isSettled = split?.isSettled || false;
+                          
+                          return (
                           <div key={expense.id} className="flex justify-between items-center text-sm border-b border-gray-50 pb-2">
                             <div>
-                              <p className="text-gray-800 font-medium">{expense.title || expense.description || 'Expense'}</p>
+                              <p className={`font-medium ${isSettled ? 'text-gray-400 line-through' : 'text-gray-800'}`}>{expense.title || expense.description || 'Expense'}</p>
                               <p className="text-[10px] text-gray-500">ยอดบิลเต็ม: ฿{toTHB(expense).toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
                             </div>
-                            <span className="font-semibold text-rose-600">฿{shareAmt.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                            <div className="flex items-center gap-3">
+                              <span className={`font-semibold ${isSettled ? 'text-gray-400 line-through' : 'text-rose-600'}`}>฿{shareAmt.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleParticipantSettled(expense.id, mId, isSettled);
+                                }}
+                                className={`flex h-5 w-5 items-center justify-center border-2 rounded-md transition-all ${
+                                  isSettled
+                                    ? "border-[#4a7c59] bg-[#4a7c59] text-[#fdfbf7]"
+                                    : "border-gray-300 bg-white hover:border-gray-400"
+                                }`}
+                              >
+                                {isSettled && (
+                                  <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                    <polyline points="2,6 5,9 10,3" />
+                                  </svg>
+                                )}
+                              </button>
+                            </div>
                           </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     )}
                     <div className="mt-2 text-right text-xs text-gray-500 font-medium">
