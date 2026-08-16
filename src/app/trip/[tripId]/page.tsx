@@ -46,6 +46,7 @@ export default function TripDetailPage({ params }: { params: Promise<{ tripId: s
   const [refreshToggle,      setRefreshToggle]      = useState(0);
   const [activityToDelete,   setActivityToDelete]   = useState<{dayNumber: number; activityId: string; title: string} | null>(null);
   const [selectedExpenseDetail, setSelectedExpenseDetail] = useState<any | null>(null);
+  const [inspectedMember,    setInspectedMember]    = useState<any | null>(null);
 
   // Keep localTrip synced whenever context mutates (e.g. after updateTrip resolves)
   useEffect(() => {
@@ -546,7 +547,11 @@ export default function TripDetailPage({ params }: { params: Promise<{ tripId: s
                       const isDebtor = b.net < -0.01;
 
                       return (
-                        <div key={b.id} className="bg-white rounded-2xl p-4 border shadow-sm space-y-2">
+                        <div 
+                          key={b.id} 
+                          onClick={() => setInspectedMember(b)}
+                          className="bg-white rounded-2xl p-4 border shadow-sm space-y-2 cursor-pointer hover:border-blue-400 hover:shadow-md transition-all"
+                        >
                           <div className="flex justify-between items-center">
                             <span className="font-bold text-gray-900">{b.name}</span>
                             <span className={`text-xs px-3 py-1 rounded-full font-semibold ${
@@ -562,9 +567,14 @@ export default function TripDetailPage({ params }: { params: Promise<{ tripId: s
                             </span>
                           </div>
 
-                          <div className="flex justify-between text-xs text-gray-500 pt-2 border-t">
-                            <span>จ่ายไป: <strong className="text-gray-800 font-semibold">฿{b.paid.toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong></span>
-                            <span>ส่วนตัว: <strong className="text-gray-800 font-semibold">฿{b.share.toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong></span>
+                          <div className="flex justify-between text-xs text-gray-500 pt-2 border-t items-center">
+                            <div className="flex gap-4">
+                              <span>จ่ายไป: <strong className="text-gray-800 font-semibold">฿{b.paid.toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong></span>
+                              <span>ส่วนตัว: <strong className="text-gray-800 font-semibold">฿{b.share.toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong></span>
+                            </div>
+                            <span className="text-blue-500 font-medium hover:text-blue-700 flex items-center gap-1">
+                              🔍 ดูประวัติ
+                            </span>
                           </div>
                         </div>
                       );
@@ -735,6 +745,149 @@ export default function TripDetailPage({ params }: { params: Promise<{ tripId: s
                 );
               })}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Inspected Member Modal */}
+      {inspectedMember && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60"
+          onClick={() => setInspectedMember(null)}
+        >
+          <div 
+            className="bg-white rounded-2xl p-5 w-full max-w-lg max-h-[85vh] overflow-y-auto shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-center mb-4 pb-3 border-b">
+              <div>
+                <h3 className="font-bold text-gray-900 text-lg flex items-center gap-2">
+                  <span>{inspectedMember.name}</span>
+                </h3>
+                <span className={`inline-block mt-1 text-xs px-2 py-0.5 rounded font-semibold ${
+                  inspectedMember.net > 0.01 
+                    ? 'bg-emerald-100 text-emerald-700' 
+                    : inspectedMember.net < -0.01 
+                    ? 'bg-rose-100 text-rose-700' 
+                    : 'bg-gray-100 text-gray-700'
+                }`}>
+                  {inspectedMember.net > 0.01 && `ยอดรับคืน: +฿${inspectedMember.net.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
+                  {inspectedMember.net < -0.01 && `ยอดค้างจ่าย: -฿${Math.abs(inspectedMember.net).toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
+                  {Math.abs(inspectedMember.net) <= 0.01 && 'ยอดสุทธิลงตัว: ฿0.00'}
+                </span>
+              </div>
+              <button 
+                onClick={() => setInspectedMember(null)}
+                className="text-gray-400 hover:text-gray-600 text-xl p-1 h-8 w-8 flex items-center justify-center bg-gray-100 rounded-full"
+              >
+                ✕
+              </button>
+            </div>
+            
+            {(() => {
+              const mId = inspectedMember.id;
+              
+              const toTHB = (e: any): number => {
+                if (!e) return 0;
+                if (e.currency === 'THB' || !e.currency) return Number(e.amount) || 0;
+                const rate = Number(e.custom_exchange_rate) > 0 
+                  ? Number(e.custom_exchange_rate) 
+                  : (Number(e.exchange_rate) > 0 && Number(e.exchange_rate) !== 1 ? Number(e.exchange_rate) : 0.209096);
+                const raw = Number(e.foreign_amount) > 0 ? Number(e.foreign_amount) : (Number(e.amount) || 0);
+                return raw * rate;
+              };
+
+              // Paid Out-of-Pocket
+              const paidExpenses = (trip.expenses || []).filter((e: any) => String(e.paid_by || e.paidById || e.payer_id || '').trim() === mId);
+              
+              // Consumed Share
+              const sharedExpenses = (trip.expenses || []).map((e: any) => {
+                const splits = Array.isArray(e.split_members) ? e.split_members : (Array.isArray(e.splits) ? e.splits : []);
+                const mySplit = splits.find((s: any) => String(s?.participantId || s?.id || s).trim() === mId);
+                if (!mySplit) return null;
+
+                let shareAmt = 0;
+                if (typeof mySplit === 'object' && mySplit.amount !== undefined) {
+                  const rate = (e.currency !== 'THB' && e.currency) 
+                    ? (Number(e.custom_exchange_rate) || Number(e.exchange_rate) || 0.209096) 
+                    : 1;
+                  shareAmt = Number(mySplit.amount) * rate;
+                } else {
+                  shareAmt = toTHB(e) / (splits.length || 1);
+                }
+                return { expense: e, shareAmt };
+              }).filter(Boolean) as { expense: any; shareAmt: number }[];
+
+              return (
+                <div className="space-y-6">
+                  {/* Section A: Paid Out-of-Pocket */}
+                  <div>
+                    <h4 className="font-semibold text-blue-800 text-sm mb-2 flex items-center gap-2">
+                      <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-xs font-bold">A</span> 
+                      รายการที่จ่ายออกไป (Paid Out-of-Pocket)
+                    </h4>
+                    {paidExpenses.length === 0 ? (
+                      <p className="text-xs text-gray-400 italic px-2">ไม่มีรายการที่สำรองจ่าย</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {paidExpenses.map((e: any) => (
+                          <div key={e.id} className="flex justify-between items-center text-sm border-b border-gray-50 pb-2">
+                            <div>
+                              <p className="text-gray-800 font-medium">{e.title || e.description || 'Expense'}</p>
+                              <p className="text-[10px] text-gray-500">{new Date(e.date || e.created_at || Date.now()).toLocaleDateString('en-GB')}</p>
+                            </div>
+                            <span className="font-semibold text-blue-700">฿{toTHB(e).toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    <div className="mt-2 text-right text-xs text-gray-500 font-medium">
+                      รวมยอดสำรองจ่าย: <strong className="text-blue-700 text-sm">฿{inspectedMember.paid.toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong>
+                    </div>
+                  </div>
+
+                  {/* Section B: Consumed Share */}
+                  <div>
+                    <h4 className="font-semibold text-rose-800 text-sm mb-2 flex items-center gap-2">
+                      <span className="bg-rose-100 text-rose-700 px-2 py-0.5 rounded text-xs font-bold">B</span> 
+                      รายการที่ร่วมหาร (Consumed Share)
+                    </h4>
+                    {sharedExpenses.length === 0 ? (
+                      <p className="text-xs text-gray-400 italic px-2">ไม่มีรายการที่ต้องหาร</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {sharedExpenses.map(({ expense, shareAmt }: { expense: any; shareAmt: number }) => (
+                          <div key={expense.id} className="flex justify-between items-center text-sm border-b border-gray-50 pb-2">
+                            <div>
+                              <p className="text-gray-800 font-medium">{expense.title || expense.description || 'Expense'}</p>
+                              <p className="text-[10px] text-gray-500">ยอดบิลเต็ม: ฿{toTHB(expense).toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
+                            </div>
+                            <span className="font-semibold text-rose-600">฿{shareAmt.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    <div className="mt-2 text-right text-xs text-gray-500 font-medium">
+                      รวมยอดที่ต้องรับผิดชอบ: <strong className="text-rose-600 text-sm">฿{inspectedMember.share.toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong>
+                    </div>
+                  </div>
+
+                  {/* Summary Footer */}
+                  <div className="bg-gray-50 rounded-xl p-4 border border-gray-200 mt-4">
+                    <p className="text-xs text-center text-gray-500 mb-1">สรุปการคำนวณยอดสุทธิ (A - B)</p>
+                    <p className="text-center font-mono text-sm font-semibold text-gray-800 flex items-center justify-center flex-wrap gap-2">
+                      <span>ยอดจ่าย <span className="text-blue-600">฿{inspectedMember.paid.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span></span>
+                      <span className="text-gray-400">-</span>
+                      <span>ยอดหาร <span className="text-rose-600">฿{inspectedMember.share.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span></span>
+                      <span className="text-gray-400">=</span>
+                      <span className={inspectedMember.net > 0.01 ? 'text-emerald-600' : inspectedMember.net < -0.01 ? 'text-rose-600' : 'text-gray-900'}>
+                        ฿{inspectedMember.net.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                      </span>
+                    </p>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         </div>
       )}
