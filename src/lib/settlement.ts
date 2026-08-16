@@ -1,5 +1,85 @@
-import { Expense, Settlement, Currency, Participant } from "@/types/trip";
+import { Expense, Settlement, Currency, Participant, ExpenseSplit } from "@/types/trip";
 import { Rates, convertToBase, getExchangeRate, getConvertedAmountTHB } from "@/lib/currency";
+
+export function resolvePayerId(expense: any, participants: Participant[]): string | undefined {
+  const payerVal = String(expense.paidById || expense.paid_by || expense.payer_id || expense.payer || expense.created_by || expense.createdBy || '').trim();
+  if (!payerVal) return undefined;
+
+  for (const p of participants) {
+    const memberId = String(p.id || '').trim();
+    const memberName = String(p.name || '').trim();
+    const memberUserId = String((p as any).user_id || '').trim();
+
+    if (
+      (memberId && payerVal === memberId) ||
+      (memberUserId && payerVal === memberUserId) ||
+      (memberName && payerVal.toLowerCase() === memberName.toLowerCase())
+    ) {
+      return memberId;
+    }
+  }
+  
+  // Fallback to exactly what was in the database if no match, just in case
+  return payerVal;
+}
+
+export function isSplitMember(expense: any, member: Participant): boolean {
+  if (!expense || !member) return false;
+  const splits = Array.isArray(expense.splits) ? expense.splits : [];
+  const splitMembers = Array.isArray(expense.split_members) ? expense.split_members : [];
+  const splitWith = Array.isArray(expense.split_with) ? expense.split_with : [];
+  
+  const memberId = String(member.id || '').trim();
+  const memberName = String(member.name || '').trim();
+
+  // Check expense.splits
+  for (const s of splits) {
+    const sVal = String(s?.participantId || s?.id || s || '').trim();
+    if (sVal === memberId || (memberName && sVal.toLowerCase() === memberName.toLowerCase())) return true;
+  }
+  
+  // Check expense.split_members and split_with
+  for (const s of [...splitMembers, ...splitWith]) {
+    const sVal = String(s?.id || s || '').trim();
+    if (sVal === memberId || (memberName && sVal.toLowerCase() === memberName.toLowerCase())) return true;
+  }
+
+  return false;
+}
+
+export function getResolvedSplits(expense: any, participants: Participant[]): ExpenseSplit[] {
+  let rawSplits = Array.isArray(expense.splits) ? expense.splits : [];
+  if (rawSplits.length === 0) {
+    const fallbackSplits = Array.isArray(expense.split_members) ? expense.split_members : (Array.isArray(expense.split_with) ? expense.split_with : []);
+    rawSplits = fallbackSplits.map((s: any) => ({
+      participantId: String(s?.id || s || ''),
+      amount: expense.amount / Math.max(1, fallbackSplits.length),
+      isSettled: false
+    }));
+  }
+
+  return rawSplits.map((split: any) => {
+    const sVal = String(split?.participantId || split?.id || split || '').trim();
+    let resolvedId = sVal;
+    
+    for (const p of participants) {
+      const memberId = String(p.id || '').trim();
+      const memberName = String(p.name || '').trim();
+      if (
+        (memberId && sVal === memberId) ||
+        (memberName && sVal.toLowerCase() === memberName.toLowerCase())
+      ) {
+        resolvedId = memberId;
+        break;
+      }
+    }
+
+    return {
+      ...split,
+      participantId: resolvedId,
+    };
+  });
+}
 
 export interface MemberBalance {
   id: string;
@@ -32,33 +112,32 @@ export function computeMemberBalances(
       const expAmount = parseFloat(exp.amount as any) || 0;
       if (expAmount <= 0) continue;
 
-      // Resolve payer identity across all known DB column aliases
-      const actualPaidById =
-        exp.paidById ||
-        (exp as any).paid_by ||
-        (exp as any).payer_id ||
-        (exp as any).created_by ||
-        (exp as any).createdBy;
+      const resolvedPayerId = resolvePayerId(exp, participants);
 
       // Total bill converted to base currency
       const totalBillBase = getConvertedAmountTHB(exp);
 
       // A: Did this member pay the bill up-front?
-      if (actualPaidById === member.id) {
+      if (resolvedPayerId === member.id) {
         paid += totalBillBase;
       }
 
       // B: What is this member's allocated share?
-      const mySplit = (exp.splits ?? []).find((s) => s.participantId === member.id);
+      const resolvedSplits = getResolvedSplits(exp, participants);
+      const mySplit = resolvedSplits.find((s) => s.participantId === member.id);
+      
       if (mySplit) {
-        const splitAmt = parseFloat(mySplit.amount as any) || 0;
-        // For new-style expenses: split.amount is already in base currency (THB).
-        // For legacy foreign expenses (no foreignAmount field): split.amount is in
-        // the expense's original currency and must be converted.
-        const shareBase =
-          exp.foreignAmount !== undefined
+        let shareBase = 0;
+        if (exp.splitType === 'CUSTOM') {
+          const splitAmt = parseFloat(mySplit.amount as any) || 0;
+          shareBase = exp.foreignAmount !== undefined
             ? splitAmt
             : splitAmt * getExchangeRate(exp);
+        } else {
+          // Equal split - calculate exactly as total / count to avoid rounding differences
+          const splitCount = resolvedSplits.length || 1;
+          shareBase = totalBillBase / splitCount;
+        }
         share += shareBase;
       }
     }
@@ -159,17 +238,14 @@ export function computeSettlementsInBase(
     const expAmount = parseFloat(exp.amount as any) || 0;
     if (expAmount <= 0) continue;
 
-    // ── 3. Resolve payer — check multiple keys for accurate payer identity ──
-    const actualPaidById = exp.paidById || (exp as any).paid_by || (exp as any).payer_id;
-    const paidBy = actualPaidById && actualPaidById.trim() 
-      ? actualPaidById 
-      : ((exp as any).created_by || (exp as any).createdBy);
+    // ── 3. Resolve payer — robust match against participants ──────────────────
+    const paidBy = resolvePayerId(exp, allParticipants);
 
     // Can't do anything without a valid payer identity
     if (!paidBy) continue;
 
     // ── 4. Resolve splits — synthesize equal splits if missing ───────────────
-    let effectiveSplits = exp.splits ?? [];
+    let effectiveSplits = getResolvedSplits(exp, allParticipants);
 
     if (effectiveSplits.length === 0 && allParticipants.length > 0) {
       // No splits recorded → distribute equally among everyone
@@ -196,11 +272,17 @@ export function computeSettlementsInBase(
       const splitAmt = parseFloat(split.amount as any) || 0;
       
       // Convert this split's share to base currency
-      // For new foreign expenses, split.amount is already in base currency.
-      // For legacy foreign expenses, split.amount is in foreign currency and needs conversion.
-      const shareBase = (exp.foreignAmount !== undefined) 
-        ? splitAmt 
-        : splitAmt * getExchangeRate(exp);
+      // If it's a CUSTOM split, use the split amount (converted if needed).
+      // If it's an EQUAL split, divide the total base bill by the number of splits to avoid rounding errors.
+      let shareBase = 0;
+      if (exp.splitType === 'CUSTOM') {
+        shareBase = (exp.foreignAmount !== undefined) 
+          ? splitAmt 
+          : splitAmt * getExchangeRate(exp);
+      } else {
+        const totalBillBase = getConvertedAmountTHB(exp);
+        shareBase = totalBillBase / effectiveSplits.length;
+      }
 
       if (shareBase <= 0) continue;
 

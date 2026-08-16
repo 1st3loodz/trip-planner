@@ -9,6 +9,7 @@ import { useCurrency } from "@/contexts/CurrencyContext";
 import { getExchangeRate, getConvertedAmountTHB } from "@/lib/currency";
 import { convertToBase, formatBase } from "@/lib/currency";
 import { formatCurrency } from "@/lib/utils";
+import { computeMemberBalances } from "@/lib/settlement";
 import Avatar from "@/components/Avatar";
 import MemberCategoryChart from "@/components/MemberCategoryChart";
 
@@ -119,26 +120,11 @@ export default function IndividualSummary({ expenses, participants, customCatego
 
   // ── Net balance: totalPaid - totalShare (across ALL expenses, unfiltered) ──
   const { totalPaidBase, netBalanceBase } = useMemo(() => {
-    let paid = 0;
-    let share = 0;
-    for (const exp of expenses) {
-      if (exp.isExcluded) continue;
-      const totalBill = getConvertedAmountTHB(exp);
-      const actualPaidById = exp.paidById || (exp as any).paid_by || (exp as any).payer_id || (exp as any).created_by;
-      if (actualPaidById === selectedId) paid += totalBill;
-      const mySplit = exp.splits?.find(s => s.participantId === selectedId);
-      if (mySplit) {
-        if (exp.splitType === 'CUSTOM') {
-          const rate = getExchangeRate(exp);
-          const isLegacy = exp.foreignAmount === undefined && exp.currency !== baseCurrency;
-          share += isLegacy ? Number(mySplit.amount) * rate : Number(mySplit.amount);
-        } else {
-          share += totalBill / (exp.splits?.length || 1);
-        }
-      }
-    }
-    return { totalPaidBase: paid, netBalanceBase: paid - share };
-  }, [expenses, selectedId, baseCurrency, rates]);
+    const balances = computeMemberBalances(expenses, participants);
+    const myBalance = balances.find((b: any) => b.id === selectedId);
+    if (!myBalance) return { totalPaidBase: 0, netBalanceBase: 0 };
+    return { totalPaidBase: myBalance.paid, netBalanceBase: myBalance.net };
+  }, [expenses, participants, selectedId]);
 
   function formatDate(isoDate: string) {
     return new Date(isoDate + "T00:00:00").toLocaleDateString("en-US", {
