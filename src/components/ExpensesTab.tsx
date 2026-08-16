@@ -13,7 +13,7 @@ import { useCurrency } from "@/contexts/CurrencyContext";
 import { computeSettlementsInBase } from "@/lib/settlement";
 import ExpenseCard          from "@/components/ExpenseCard";
 import ExpenseDetailModal   from "@/components/ExpenseDetailModal";
-import SettlementCalculator from "@/components/SettlementCalculator";
+import SettlementV2         from "@/components/settlement/SettlementV2";
 import AddExpenseModal       from "@/components/AddExpenseModal";
 import IndividualSummary     from "@/components/IndividualSummary";
 import CurrencySettings      from "@/components/CurrencySettings";
@@ -338,12 +338,9 @@ export default function ExpensesTab({
           </p>
           
 
-          <SettlementCalculator
-            settlements={settlements}
-            participants={participants}
+          <SettlementV2
+            members={participants}
             expenses={expenses}
-            onEditExpense={onEditExpense}
-            onEditExpenses={onEditExpenses}
           />
         </div>
       )}
