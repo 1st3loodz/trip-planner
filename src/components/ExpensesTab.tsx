@@ -7,7 +7,7 @@ import {
 } from "@/types/trip";
 import { formatCurrency } from "@/lib/utils";
 import { convertToBase, formatBase, getExchangeRate, getConvertedAmountTHB } from "@/lib/currency";
-import { ExpensePieChart } from "./ExpensePieChart";
+import ExpensePieChart from "./ExpensePieChart";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { useCurrency } from "@/contexts/CurrencyContext";
 import { computeSettlementsInBase } from "@/lib/settlement";
@@ -93,7 +93,7 @@ export default function ExpensesTab({
     .filter((e) => {
       if (!e) return false;
       if (!filterCat || filterCat === "all") return true;
-      const topic = (e?.topic || e?.category || e?.type || '').toLowerCase();
+      const topic = ((e as any)?.topic || e?.category || (e as any)?.type || '').toLowerCase();
       return topic === filterCat.toLowerCase();
     })
     .filter((e) => {
@@ -388,7 +388,7 @@ export default function ExpensesTab({
               </button>
               <button 
                 onClick={() => {
-                  onDeleteExpense(expenseToDelete);
+                  onDeleteExpense?.(expenseToDelete);
                   setExpenseToDelete(null);
                 }} 
                 className="game-btn flex-1 bg-[#4a7c59] py-2.5 font-pixel text-[10px] uppercase tracking-wider text-[#fdfbf7] dark:bg-[#2d5a3d]"

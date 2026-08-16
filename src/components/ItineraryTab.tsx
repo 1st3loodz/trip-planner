@@ -172,7 +172,7 @@ export default function ItineraryTab({ trip, onAddActivity, onEditActivity, onDe
               try {
                 if (!day) return null;
                 return (
-                  <ErrorBoundary key={day?.id || day?.dayNumber || idx}>
+                  <ErrorBoundary key={day?.dayNumber || idx}>
                     <DayCard
                       day={day}
                       destination={trip.destination}
@@ -201,7 +201,7 @@ export default function ItineraryTab({ trip, onAddActivity, onEditActivity, onDe
                     try {
                       if (!day) return null;
                       return (
-                        <ErrorBoundary key={day?.id || day?.dayNumber || index}>
+                        <ErrorBoundary key={day?.dayNumber || index}>
                           <Draggable draggableId={String(day?.dayNumber || index)} index={index}>
                             {(dragProvided, dragSnapshot) => (
                               <div

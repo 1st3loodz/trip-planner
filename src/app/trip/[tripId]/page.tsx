@@ -458,13 +458,7 @@ export default function TripDetailPage({ params }: { params: Promise<{ tripId: s
         <ConfirmDeleteModal
           itemName="activity"
           title={activityToDelete.title}
-          description={
-            <>
-              Are you sure you want to delete{" "}
-              <strong className="text-stone-800 dark:text-red-400">{activityToDelete.title}</strong>?
-              This action cannot be undone and it will be removed from your itinerary permanently.
-            </>
-          }
+          description={`Are you sure you want to delete "${activityToDelete.title}"? This action cannot be undone and it will be removed from your itinerary permanently.`}
           onConfirm={executeDeleteActivity}
           onCancel={() => setActivityToDelete(null)}
         />
