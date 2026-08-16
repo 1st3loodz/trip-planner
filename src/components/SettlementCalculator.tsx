@@ -3,16 +3,19 @@
 import { useState, useMemo } from "react";
 import { Settlement, Participant, CURRENCY_META, EXPENSE_CATEGORY_META, Expense } from "@/types/trip";
 import { formatCurrency } from "@/lib/utils";
+import { formatBase, getConvertedAmountTHB } from "@/lib/currency";
+import { computeMemberBalances } from "@/lib/settlement";
 import Avatar from "@/components/Avatar";
 
 interface SettlementCalculatorProps {
   settlements:  Settlement[];
   participants: Participant[];
+  expenses:     Expense[];
   onEditExpense: (e: Expense) => void;
   onEditExpenses?: (e: Expense[]) => void;
 }
 
-export default function SettlementCalculator({ settlements, participants, onEditExpense, onEditExpenses }: SettlementCalculatorProps) {
+export default function SettlementCalculator({ settlements, participants, expenses, onEditExpense, onEditExpenses }: SettlementCalculatorProps) {
   // Set of keys marking settlements expanded to show breakdown
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   
@@ -21,6 +24,15 @@ export default function SettlementCalculator({ settlements, participants, onEdit
   
   // Member Filter
   const [memberFilter, setMemberFilter] = useState<string>("all");
+
+  // Debug panel toggle
+  const [showDebug, setShowDebug] = useState(false);
+
+  // ── Per-member balance audit (paid / share / net) ──────────────────────────
+  const memberBalances = useMemo(
+    () => computeMemberBalances(expenses, participants),
+    [expenses, participants]
+  );
 
   function settlementKey(s: Settlement) {
     return `${s.fromId}-${s.toId}`;
@@ -214,6 +226,115 @@ export default function SettlementCalculator({ settlements, participants, onEdit
 
   return (
     <div className="space-y-4">
+      {/* ── Balance Audit Debug Panel ───────────────────────────────────────── */}
+      <div className="border-2 border-stone-400 bg-[#fdfbf7] dark:border-[#54463d] dark:bg-[#28211d]">
+        <button
+          onClick={() => setShowDebug(v => !v)}
+          className="flex w-full items-center justify-between px-4 py-2.5 hover:bg-[#f5eed7] dark:hover:bg-[#362d28] transition-colors"
+        >
+          <div className="flex items-center gap-2">
+            <span className="text-sm">🔍</span>
+            <span className="font-pixel text-[8px] uppercase tracking-widest text-stone-600 dark:text-stone-400">
+              Balance Audit — Verify Creditor / Debtor Direction
+            </span>
+          </div>
+          <span className="font-mono text-[10px] text-stone-500 dark:text-stone-400">
+            {showDebug ? "▲ Hide" : "▼ Show"}
+          </span>
+        </button>
+
+        {showDebug && (
+          <div className="border-t-2 border-stone-300 dark:border-[#54463d] p-4">
+            <p className="mb-3 font-mono text-[10px] text-stone-500 dark:text-stone-400">
+              Formula: <span className="font-semibold text-stone-700 dark:text-stone-300">net = totalPaid − totalShare</span>
+              &nbsp;·&nbsp;
+              <span className="text-[#4a7c59] dark:text-emerald-400 font-semibold">net &gt; 0 = เจ้าหนี้ Creditor (should RECEIVE)</span>
+              &nbsp;·&nbsp;
+              <span className="text-red-600 dark:text-red-400 font-semibold">net &lt; 0 = ลูกหนี้ Debtor (must PAY)</span>
+            </p>
+
+            <div className="overflow-x-auto">
+              <table className="w-full font-mono text-[11px]">
+                <thead>
+                  <tr className="border-b-2 border-stone-300 dark:border-stone-600">
+                    <th className="pb-2 text-left font-pixel text-[8px] uppercase tracking-wider text-stone-500 dark:text-stone-400">Member</th>
+                    <th className="pb-2 text-right font-pixel text-[8px] uppercase tracking-wider text-stone-500 dark:text-stone-400">Paid (A)</th>
+                    <th className="pb-2 text-right font-pixel text-[8px] uppercase tracking-wider text-stone-500 dark:text-stone-400">Share (B)</th>
+                    <th className="pb-2 text-right font-pixel text-[8px] uppercase tracking-wider text-stone-500 dark:text-stone-400">Net = A−B</th>
+                    <th className="pb-2 text-center font-pixel text-[8px] uppercase tracking-wider text-stone-500 dark:text-stone-400">Status</th>
+                    <th className="pb-2 text-left font-pixel text-[8px] uppercase tracking-wider text-stone-500 dark:text-stone-400">Settlement Rows</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-stone-200 dark:divide-stone-700">
+                  {memberBalances.map((mb) => {
+                    const isCreditor = mb.net > 0.5;
+                    const isDebtor   = mb.net < -0.5;
+                    const p = participants.find(p => p.id === mb.id);
+
+                    // Which settlement rows list this member?
+                    const mySettlements = settlements.filter(
+                      s => s.fromId === mb.id || s.toId === mb.id
+                    );
+
+                    return (
+                      <tr key={mb.id} className="py-2">
+                        <td className="py-2 pr-3">
+                          <div className="flex items-center gap-2">
+                            {p && <Avatar name={p.name} colorClass={p.color} size="xs" tooltip={false} />}
+                            <span className="font-semibold text-stone-800 dark:text-[#fdfbf7]">{mb.name}</span>
+                          </div>
+                        </td>
+                        <td className="py-2 pr-3 text-right tabular-nums text-stone-700 dark:text-stone-300">
+                          {formatBase(mb.paid, settlements[0]?.currency ?? 'THB')}
+                        </td>
+                        <td className="py-2 pr-3 text-right tabular-nums text-stone-700 dark:text-stone-300">
+                          {formatBase(mb.share, settlements[0]?.currency ?? 'THB')}
+                        </td>
+                        <td className={`py-2 pr-3 text-right tabular-nums font-bold ${isCreditor ? 'text-[#4a7c59] dark:text-emerald-400' : isDebtor ? 'text-red-700 dark:text-red-400' : 'text-stone-500 dark:text-stone-400'}`}>
+                          {mb.net > 0 ? "+" : ""}{formatBase(mb.net, settlements[0]?.currency ?? 'THB')}
+                        </td>
+                        <td className="py-2 pr-3 text-center">
+                          <span className={`border-2 px-2 py-0.5 font-pixel text-[7px] uppercase tracking-wider whitespace-nowrap ${
+                            isCreditor
+                              ? 'border-[#4a7c59] bg-[#4a7c59]/10 text-[#2d5a3d] dark:text-emerald-400'
+                              : isDebtor
+                                ? 'border-red-400 bg-red-50 text-red-700 dark:border-red-700 dark:bg-red-900/20 dark:text-red-400'
+                                : 'border-stone-400 bg-stone-100 text-stone-600 dark:border-stone-600 dark:bg-stone-800 dark:text-stone-400'
+                          }`}>
+                            {isCreditor ? '✓ RECEIVE' : isDebtor ? '↑ PAY' : '= SETTLED'}
+                          </span>
+                        </td>
+                        <td className="py-2 text-[10px] text-stone-500 dark:text-stone-400 max-w-[200px]">
+                          {mySettlements.length === 0 ? (
+                            <span className="italic">None</span>
+                          ) : mySettlements.map((s, i) => {
+                            const other = s.fromId === mb.id ? s.toId : s.fromId;
+                            const role  = s.fromId === mb.id ? '→ pays' : '← receives from';
+                            const otherName = participants.find(p => p.id === other)?.name ?? other.slice(0, 6);
+                            return (
+                              <span key={i} className={`inline-flex items-center gap-1 mr-1.5 ${s.fromId === mb.id ? 'text-red-600 dark:text-red-400' : 'text-[#4a7c59] dark:text-emerald-400'}`}>
+                                {role} {otherName} ({formatBase(s.amount, s.currency)})
+                              </span>
+                            );
+                          })}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="mt-3 border-t border-stone-300 dark:border-stone-600 pt-3">
+              <p className="font-pixel text-[8px] uppercase tracking-wider text-stone-500 dark:text-stone-400">
+                Settlement rows below: <span className="font-mono normal-case text-stone-700 dark:text-stone-300">fromId</span> = the person who <strong>pays</strong> &nbsp;·&nbsp;
+                <span className="font-mono normal-case text-stone-700 dark:text-stone-300">toId</span> = the person who <strong>receives</strong>
+              </p>
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* Top Controls */}
       <div className="flex flex-wrap items-center justify-between gap-3 border-2 border-stone-400 bg-[#f5eed7] px-4 py-3 dark:border-[#54463d] dark:bg-[#28211d]">
         <div className="flex items-center gap-2 min-w-0 flex-wrap">

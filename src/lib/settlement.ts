@@ -1,5 +1,79 @@
 import { Expense, Settlement, Currency, Participant } from "@/types/trip";
-import { Rates, convertToBase, getExchangeRate } from "@/lib/currency";
+import { Rates, convertToBase, getExchangeRate, getConvertedAmountTHB } from "@/lib/currency";
+
+export interface MemberBalance {
+  id: string;
+  name: string;
+  /** Total amount this member physically paid out-of-pocket (in base currency) */
+  paid: number;
+  /** Total amount this member is responsible to consume (their share, in base currency) */
+  share: number;
+  /** net = paid - share. Positive → CREDITOR (should receive). Negative → DEBTOR (must pay). */
+  net: number;
+}
+
+/**
+ * Computes raw per-member net balances using the canonical formula:
+ *   net = totalPaid - totalShare
+ *   net > 0  → CREDITOR (เจ้าหนี้) — paid more than consumed, should RECEIVE money
+ *   net < 0  → DEBTOR   (ลูกหนี้) — consumed more than paid,  MUST PAY money
+ *   net = 0  → SETTLED  (ลงตัว)  — perfectly balanced
+ */
+export function computeMemberBalances(
+  expenses: Expense[],
+  participants: Participant[],
+): MemberBalance[] {
+  return participants.map((member) => {
+    let paid = 0;
+    let share = 0;
+
+    for (const exp of expenses) {
+      if (exp.isExcluded) continue;
+      const expAmount = parseFloat(exp.amount as any) || 0;
+      if (expAmount <= 0) continue;
+
+      // Resolve payer identity across all known DB column aliases
+      const actualPaidById =
+        exp.paidById ||
+        (exp as any).paid_by ||
+        (exp as any).payer_id ||
+        (exp as any).created_by ||
+        (exp as any).createdBy;
+
+      // Total bill converted to base currency
+      const totalBillBase = getConvertedAmountTHB(exp);
+
+      // A: Did this member pay the bill up-front?
+      if (actualPaidById === member.id) {
+        paid += totalBillBase;
+      }
+
+      // B: What is this member's allocated share?
+      const mySplit = (exp.splits ?? []).find((s) => s.participantId === member.id);
+      if (mySplit) {
+        const splitAmt = parseFloat(mySplit.amount as any) || 0;
+        // For new-style expenses: split.amount is already in base currency (THB).
+        // For legacy foreign expenses (no foreignAmount field): split.amount is in
+        // the expense's original currency and must be converted.
+        const shareBase =
+          exp.foreignAmount !== undefined
+            ? splitAmt
+            : splitAmt * getExchangeRate(exp);
+        share += shareBase;
+      }
+    }
+
+    const net = paid - share;
+
+    return {
+      id:    member.id,
+      name:  member.name,
+      paid:  Math.round(paid  * 100) / 100,
+      share: Math.round(share * 100) / 100,
+      net:   Math.round(net   * 100) / 100,
+    };
+  });
+}
 
 /**
  * Original multi-currency settlement (no conversion).

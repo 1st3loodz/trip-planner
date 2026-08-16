@@ -332,6 +332,7 @@ export default function ExpensesTab({
           <SettlementCalculator
             settlements={settlements}
             participants={participants}
+            expenses={expenses}
             onEditExpense={onEditExpense}
             onEditExpenses={onEditExpenses}
           />
