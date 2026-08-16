@@ -253,76 +253,77 @@ export default function SettlementCalculator({ settlements, participants, expens
               <span className="text-red-600 dark:text-red-400 font-semibold">net &lt; 0 = ลูกหนี้ Debtor (must PAY)</span>
             </p>
 
-            <div className="overflow-x-auto">
-              <table className="w-full font-mono text-[11px]">
-                <thead>
-                  <tr className="border-b-2 border-stone-300 dark:border-stone-600">
-                    <th className="pb-2 text-left font-pixel text-[8px] uppercase tracking-wider text-stone-500 dark:text-stone-400">Member</th>
-                    <th className="pb-2 text-right font-pixel text-[8px] uppercase tracking-wider text-stone-500 dark:text-stone-400">Paid (A)</th>
-                    <th className="pb-2 text-right font-pixel text-[8px] uppercase tracking-wider text-stone-500 dark:text-stone-400">Share (B)</th>
-                    <th className="pb-2 text-right font-pixel text-[8px] uppercase tracking-wider text-stone-500 dark:text-stone-400">Net = A−B</th>
-                    <th className="pb-2 text-center font-pixel text-[8px] uppercase tracking-wider text-stone-500 dark:text-stone-400">Status</th>
-                    <th className="pb-2 text-left font-pixel text-[8px] uppercase tracking-wider text-stone-500 dark:text-stone-400">Settlement Rows</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-stone-200 dark:divide-stone-700">
-                  {memberBalances.map((mb) => {
-                    const isCreditor = mb.net > 0.5;
-                    const isDebtor   = mb.net < -0.5;
-                    const p = participants.find(p => p.id === mb.id);
+            <div className="grid grid-cols-1 gap-3 mt-4">
+              {participants.map((member) => {
+                const mId = String(member.id).trim();
 
-                    // Which settlement rows list this member?
-                    const mySettlements = settlements.filter(
-                      s => s.fromId === mb.id || s.toId === mb.id
-                    );
+                // 1. Calculate Total Paid (ยอดที่คนนี้จ่ายออกไปจริง)
+                const totalPaid = expenses
+                  .filter((e) => String((e as any).paid_by || (e as any).payer_id || e.paidById || '').trim() === mId)
+                  .reduce((sum, e) => {
+                    const amt = Number(e.amount) || 0;
+                    const foreign = Number(e.foreignAmount || (e as any).foreign_amount) || amt;
+                    const rate = (e.currency !== 'THB' && e.currency) 
+                      ? (Number((e as any).custom_exchange_rate) || Number(e.exchangeRate || (e as any).exchange_rate) || 0.209096) 
+                      : 1;
+                    return sum + (e.currency === 'THB' || !e.currency ? amt : foreign * rate);
+                  }, 0);
 
-                    return (
-                      <tr key={mb.id} className="py-2">
-                        <td className="py-2 pr-3">
-                          <div className="flex items-center gap-2">
-                            {p && <Avatar name={p.name} colorClass={p.color} size="xs" tooltip={false} />}
-                            <span className="font-semibold text-stone-800 dark:text-[#fdfbf7]">{mb.name}</span>
-                          </div>
-                        </td>
-                        <td className="py-2 pr-3 text-right tabular-nums text-stone-700 dark:text-stone-300">
-                          {formatBase(mb.paid, settlements[0]?.currency ?? 'THB')}
-                        </td>
-                        <td className="py-2 pr-3 text-right tabular-nums text-stone-700 dark:text-stone-300">
-                          {formatBase(mb.share, settlements[0]?.currency ?? 'THB')}
-                        </td>
-                        <td className={`py-2 pr-3 text-right tabular-nums font-bold ${isCreditor ? 'text-[#4a7c59] dark:text-emerald-400' : isDebtor ? 'text-red-700 dark:text-red-400' : 'text-stone-500 dark:text-stone-400'}`}>
-                          {mb.net > 0 ? "+" : ""}{formatBase(mb.net, settlements[0]?.currency ?? 'THB')}
-                        </td>
-                        <td className="py-2 pr-3 text-center">
-                          <span className={`border-2 px-2 py-0.5 font-pixel text-[7px] uppercase tracking-wider whitespace-nowrap ${
-                            isCreditor
-                              ? 'border-[#4a7c59] bg-[#4a7c59]/10 text-[#2d5a3d] dark:text-emerald-400'
-                              : isDebtor
-                                ? 'border-red-400 bg-red-50 text-red-700 dark:border-red-700 dark:bg-red-900/20 dark:text-red-400'
-                                : 'border-stone-400 bg-stone-100 text-stone-600 dark:border-stone-600 dark:bg-stone-800 dark:text-stone-400'
-                          }`}>
-                            {isCreditor ? '✓ RECEIVE' : isDebtor ? '↑ PAY' : '= SETTLED'}
-                          </span>
-                        </td>
-                        <td className="py-2 text-[10px] text-stone-500 dark:text-stone-400 max-w-[200px]">
-                          {mySettlements.length === 0 ? (
-                            <span className="italic">None</span>
-                          ) : mySettlements.map((s, i) => {
-                            const other = s.fromId === mb.id ? s.toId : s.fromId;
-                            const role  = s.fromId === mb.id ? '→ pays' : '← receives from';
-                            const otherName = participants.find(p => p.id === other)?.name ?? other.slice(0, 6);
-                            return (
-                              <span key={i} className={`inline-flex items-center gap-1 mr-1.5 ${s.fromId === mb.id ? 'text-red-600 dark:text-red-400' : 'text-[#4a7c59] dark:text-emerald-400'}`}>
-                                {role} {otherName} ({formatBase(s.amount, s.currency)})
-                              </span>
-                            );
-                          })}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                // 2. Calculate Total Share (ยอดส่วนตัวที่คนนี้ต้องรับผิดชอบ)
+                const totalShare = expenses.reduce((sum, e) => {
+                  const splits = Array.isArray((e as any).split_members) ? (e as any).split_members : (Array.isArray(e.splits) ? e.splits : []);
+                  const mySplit = splits.find(
+                    (s: any) => String(s?.participantId || s?.id || s).trim() === mId
+                  );
+                  if (!mySplit) return sum;
+
+                  const rate = (e.currency !== 'THB' && e.currency) 
+                    ? (Number((e as any).custom_exchange_rate) || Number(e.exchangeRate || (e as any).exchange_rate) || 0.209096) 
+                    : 1;
+
+                  if (typeof mySplit === 'object' && mySplit.amount !== undefined) {
+                    const splitAmt = Number(mySplit.amount) || 0;
+                    // Note: if e.splitType === 'CUSTOM', we apply rate. Otherwise if it's THB we don't.
+                    return sum + (e.currency === 'THB' || !e.currency ? splitAmt : splitAmt * rate);
+                  }
+
+                  const totalBill = e.currency === 'THB' || !e.currency 
+                    ? (Number(e.amount) || 0) 
+                    : (Number(e.foreignAmount || (e as any).foreign_amount) || Number(e.amount) || 0) * rate;
+                  return sum + (totalBill / (splits.length || 1));
+                }, 0);
+
+                // 3. Net Balance (Paid - Share)
+                const net = Math.round((totalPaid - totalShare) * 100) / 100;
+                const isCreditor = net > 0.01;
+                const isDebtor = net < -0.01;
+
+                return (
+                  <div key={mId} className="bg-white border border-stone-200 dark:border-stone-700 dark:bg-stone-800 rounded-xl p-4 shadow-sm flex flex-col gap-2">
+                    <div className="flex justify-between items-center">
+                      <span className="font-semibold text-gray-900 dark:text-stone-100">{member.name}</span>
+                      <span
+                        className={`text-xs px-2.5 py-1 rounded-full font-medium ${
+                          isCreditor
+                            ? 'bg-emerald-50 text-emerald-600 border border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800'
+                            : isDebtor
+                            ? 'bg-rose-50 text-rose-600 border border-rose-200 dark:bg-rose-900/30 dark:text-rose-400 dark:border-rose-800'
+                            : 'bg-gray-100 text-gray-600 dark:bg-stone-700 dark:text-stone-300 dark:border-stone-600'
+                        }`}
+                      >
+                        {isCreditor && `ได้รับเงินคืน: +฿${net.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
+                        {isDebtor && `ต้องจ่ายเงิน: -฿${Math.abs(net).toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
+                        {!isCreditor && !isDebtor && 'ยอดลงตัว: ฿0.00'}
+                      </span>
+                    </div>
+
+                    <div className="flex justify-between text-xs text-gray-500 dark:text-stone-400 pt-2 border-t border-stone-100 dark:border-stone-700">
+                      <span>จ่ายไป: <strong className="text-gray-700 dark:text-stone-300">฿{totalPaid.toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong></span>
+                      <span>ส่วนตัว: <strong className="text-gray-700 dark:text-stone-300">฿{totalShare.toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong></span>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
 
             <div className="mt-3 border-t border-stone-300 dark:border-stone-600 pt-3">
