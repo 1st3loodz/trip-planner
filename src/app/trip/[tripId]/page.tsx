@@ -347,7 +347,7 @@ export default function TripDetailPage({ params }: { params: Promise<{ tripId: s
     await updateTrip(trip.id, { days: newDays });
   }, [trip, updateTrip, setLocalTrip]);
 
-  const toggleParticipantSettled = async (expenseId: string, participantId: string, currentStatus: boolean) => {
+  const handleToggleSettle = async (expenseId: string, participantId: string, currentStatus: boolean) => {
     if (!trip) return;
     try {
       const expense: any = trip.expenses.find((e: any) => e.id === expenseId);
@@ -810,7 +810,7 @@ export default function TripDetailPage({ params }: { params: Promise<{ tripId: s
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          toggleParticipantSettled(selectedExpenseDetail.id, memberId, isSettled);
+                          handleToggleSettle(selectedExpenseDetail.id, memberId, isSettled);
                         }}
                         className={`flex h-5 w-5 items-center justify-center border-2 rounded-md transition-all ${
                           isSettled
@@ -955,7 +955,7 @@ export default function TripDetailPage({ params }: { params: Promise<{ tripId: s
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  toggleParticipantSettled(expense.id, mId, isSettled);
+                                  handleToggleSettle(expense.id, mId, isSettled);
                                 }}
                                 className={`flex h-5 w-5 items-center justify-center border-2 rounded-md transition-all ${
                                   isSettled
