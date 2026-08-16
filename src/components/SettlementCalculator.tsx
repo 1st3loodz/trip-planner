@@ -254,76 +254,82 @@ export default function SettlementCalculator({ settlements, participants, expens
             </p>
 
             <div className="grid grid-cols-1 gap-3 mt-4">
-              {participants.map((member) => {
-                const mId = String(member.id).trim();
+              {(() => {
+                const members = participants;
+                const computedBalances = (members || []).map((m) => {
+                  const mId = String(m.id).trim();
 
-                // 1. Calculate Total Paid (ยอดที่คนนี้จ่ายออกไปจริง)
-                const totalPaid = expenses
-                  .filter((e) => String((e as any).paid_by || (e as any).payer_id || e.paidById || '').trim() === mId)
-                  .reduce((sum, e) => {
-                    const amt = Number(e.amount) || 0;
-                    const foreign = Number(e.foreignAmount || (e as any).foreign_amount) || amt;
-                    const rate = (e.currency !== 'THB' && e.currency) 
-                      ? (Number((e as any).custom_exchange_rate) || Number(e.exchangeRate || (e as any).exchange_rate) || 0.209096) 
+                  // Total Paid
+                  const totalPaid = (expenses || [])
+                    .filter((e: any) => String(e.paid_by || e.paidById || '').trim() === mId)
+                    .reduce((sum, e: any) => {
+                      const amt = Number(e.amount) || 0;
+                      const foreign = Number(e.foreign_amount || e.foreignAmount) || amt;
+                      const rate = (e.currency !== 'THB' && e.currency)
+                        ? (Number(e.custom_exchange_rate || e.customExchangeRate) || Number(e.exchange_rate || e.exchangeRate) || 0.209096)
+                        : 1;
+                      return sum + (e.currency === 'THB' || !e.currency ? amt : foreign * rate);
+                    }, 0);
+
+                  // Total Share
+                  const totalShare = (expenses || []).reduce((sum, e: any) => {
+                    const splits = Array.isArray(e.split_members || e.splits) ? (e.split_members || e.splits) : [];
+                    const mySplit = splits.find((s: any) => String(s?.participantId || s?.id || s).trim() === mId);
+                    if (!mySplit) return sum;
+
+                    const rate = (e.currency !== 'THB' && e.currency)
+                      ? (Number(e.custom_exchange_rate || e.customExchangeRate) || Number(e.exchange_rate || e.exchangeRate) || 0.209096)
                       : 1;
-                    return sum + (e.currency === 'THB' || !e.currency ? amt : foreign * rate);
+
+                    if (typeof mySplit === 'object' && mySplit.amount !== undefined) {
+                      const splitAmt = Number(mySplit.amount) || 0;
+                      return sum + (e.currency === 'THB' || !e.currency ? splitAmt : splitAmt * rate);
+                    }
+                    return sum + (((Number(e.amount) || 0) * rate) / (splits.length || 1));
                   }, 0);
 
-                // 2. Calculate Total Share (ยอดส่วนตัวที่คนนี้ต้องรับผิดชอบ)
-                const totalShare = expenses.reduce((sum, e) => {
-                  const splits = Array.isArray((e as any).split_members) ? (e as any).split_members : (Array.isArray(e.splits) ? e.splits : []);
-                  const mySplit = splits.find(
-                    (s: any) => String(s?.participantId || s?.id || s).trim() === mId
+                  const net = Math.round((totalPaid - totalShare) * 100) / 100;
+
+                  return {
+                    id: mId,
+                    name: m.name,
+                    paid: Math.round(totalPaid * 100) / 100,
+                    share: Math.round(totalShare * 100) / 100,
+                    net: net,
+                  };
+                });
+
+                return computedBalances.map((b) => {
+                  const isCreditor = b.net > 0.01;
+                  const isDebtor = b.net < -0.01;
+
+                  return (
+                    <div key={b.id} className="bg-white border border-stone-200 dark:border-stone-700 dark:bg-stone-800 rounded-xl p-4 shadow-sm flex flex-col gap-2">
+                      <div className="flex justify-between items-center">
+                        <span className="font-semibold text-gray-900 dark:text-stone-100">{b.name}</span>
+                        <span
+                          className={`text-xs px-2.5 py-1 rounded-full font-medium ${
+                            isCreditor
+                              ? 'bg-emerald-50 text-emerald-600 border border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800'
+                              : isDebtor
+                              ? 'bg-rose-50 text-rose-600 border border-rose-200 dark:bg-rose-900/30 dark:text-rose-400 dark:border-rose-800'
+                              : 'bg-gray-100 text-gray-600 dark:bg-stone-700 dark:text-stone-300 dark:border-stone-600'
+                          }`}
+                        >
+                          {isCreditor && `ได้รับเงินคืน: +฿${b.net.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
+                          {isDebtor && `ต้องจ่ายเงิน: -฿${Math.abs(b.net).toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
+                          {!isCreditor && !isDebtor && 'ยอดสุทธิ: ฿0.00'}
+                        </span>
+                      </div>
+
+                      <div className="flex justify-between text-xs text-gray-500 dark:text-stone-400 pt-2 border-t border-stone-100 dark:border-stone-700">
+                        <span>จ่ายไป: <strong className="text-gray-700 dark:text-stone-300">฿{b.paid.toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong></span>
+                        <span>ส่วนที่ต้องรับผิดชอบ: <strong className="text-gray-700 dark:text-stone-300">฿{b.share.toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong></span>
+                      </div>
+                    </div>
                   );
-                  if (!mySplit) return sum;
-
-                  const rate = (e.currency !== 'THB' && e.currency) 
-                    ? (Number((e as any).custom_exchange_rate) || Number(e.exchangeRate || (e as any).exchange_rate) || 0.209096) 
-                    : 1;
-
-                  if (typeof mySplit === 'object' && mySplit.amount !== undefined) {
-                    const splitAmt = Number(mySplit.amount) || 0;
-                    // Note: if e.splitType === 'CUSTOM', we apply rate. Otherwise if it's THB we don't.
-                    return sum + (e.currency === 'THB' || !e.currency ? splitAmt : splitAmt * rate);
-                  }
-
-                  const totalBill = e.currency === 'THB' || !e.currency 
-                    ? (Number(e.amount) || 0) 
-                    : (Number(e.foreignAmount || (e as any).foreign_amount) || Number(e.amount) || 0) * rate;
-                  return sum + (totalBill / (splits.length || 1));
-                }, 0);
-
-                // 3. Net Balance (Paid - Share)
-                const net = Math.round((totalPaid - totalShare) * 100) / 100;
-                const isCreditor = net > 0.01;
-                const isDebtor = net < -0.01;
-
-                return (
-                  <div key={mId} className="bg-white border border-stone-200 dark:border-stone-700 dark:bg-stone-800 rounded-xl p-4 shadow-sm flex flex-col gap-2">
-                    <div className="flex justify-between items-center">
-                      <span className="font-semibold text-gray-900 dark:text-stone-100">{member.name}</span>
-                      <span
-                        className={`text-xs px-2.5 py-1 rounded-full font-medium ${
-                          isCreditor
-                            ? 'bg-emerald-50 text-emerald-600 border border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800'
-                            : isDebtor
-                            ? 'bg-rose-50 text-rose-600 border border-rose-200 dark:bg-rose-900/30 dark:text-rose-400 dark:border-rose-800'
-                            : 'bg-gray-100 text-gray-600 dark:bg-stone-700 dark:text-stone-300 dark:border-stone-600'
-                        }`}
-                      >
-                        {isCreditor && `ได้รับเงินคืน: +฿${net.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
-                        {isDebtor && `ต้องจ่ายเงิน: -฿${Math.abs(net).toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
-                        {!isCreditor && !isDebtor && 'ยอดลงตัว: ฿0.00'}
-                      </span>
-                    </div>
-
-                    <div className="flex justify-between text-xs text-gray-500 dark:text-stone-400 pt-2 border-t border-stone-100 dark:border-stone-700">
-                      <span>จ่ายไป: <strong className="text-gray-700 dark:text-stone-300">฿{totalPaid.toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong></span>
-                      <span>ส่วนตัว: <strong className="text-gray-700 dark:text-stone-300">฿{totalShare.toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong></span>
-                    </div>
-                  </div>
-                );
-              })}
+                });
+              })()}
             </div>
 
             <div className="mt-3 border-t border-stone-300 dark:border-stone-600 pt-3">
