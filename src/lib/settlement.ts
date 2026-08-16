@@ -114,21 +114,40 @@ export function computeMemberBalances(
   participants: Participant[],
 ): MemberBalance[] {
   return participants.map((member) => {
-    // A. All expenses where this member was the actual payer
+    // A. All expenses where this member is the payer
     const totalPaid = expenses
-      .filter(e => {
-        const payerId = String((e as any).paid_by || e.paidById || '').trim();
-        return payerId === member.id;
+      .filter((e) => {
+        if (e.isExcluded) return false;
+        return resolvePayerId(e, participants) === member.id;
       })
       .reduce((sum, e) => sum + getExpenseAmountTHB(e), 0);
 
     // B. All expenses where this member participated in the split
     const totalShare = expenses.reduce((sum, e) => {
+      if (e.isExcluded) return sum;
+      
       const splitList = Array.isArray((e as any).split_members) ? (e as any).split_members : (Array.isArray(e.splits) ? e.splits : []);
-      const isIncluded = splitList.some((s: any) => String(s?.participantId || s?.id || s).trim() === member.id);
+      const mySplit = splitList.find((s: any) => String(s?.participantId || s?.id || s).trim() === member.id);
       
-      if (!isIncluded) return sum;
+      if (!mySplit) return sum;
       
+      if (typeof mySplit === 'object' && mySplit.amount !== undefined) {
+        let rate = 1;
+        if (e.splitType === 'CUSTOM') {
+           rate = Number((e as any).custom_exchange_rate) > 0 
+            ? Number((e as any).custom_exchange_rate) 
+            : (Number((e as any).exchange_rate) > 0 && Number((e as any).exchange_rate) !== 1 ? Number((e as any).exchange_rate) : (e.currency === 'JPY' ? 0.209096 : 1));
+        } else {
+           // For equal splits with amount, maybe the DB stored THB amount already, but let's fall back to safe conversion
+           rate = getExchangeRate(e);
+        }
+        
+        // If foreignAmount is set or we are using custom split mode, it means split.amount is in foreign currency
+        // But if it's already THB, rate will be 1
+        return sum + (Number(mySplit.amount) * rate);
+      }
+      
+      // Fallback: Even split of total bill
       const totalTHB = getExpenseAmountTHB(e);
       const splitCount = splitList.length > 0 ? splitList.length : 1;
       

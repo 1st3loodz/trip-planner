@@ -420,32 +420,31 @@ export default function IndividualSummary({ expenses, participants, customCatego
             {/* ── Net Balance: เจ้าหนี้ / ลูกหนี้ badge ── */}
             <div className="mt-4 border-t-2 border-stone-800 pt-3 dark:border-[#54463d] space-y-2">
               <div className="flex items-center justify-between">
-                <span className="font-pixel text-[8px] uppercase text-stone-600 dark:text-stone-400">Total Paid (Front):</span>
+                <span className="font-pixel text-[8px] uppercase text-stone-600 dark:text-stone-400">Total Paid (จ่ายไป):</span>
                 <span className="font-mono text-xs font-semibold text-stone-700 dark:text-stone-300 tabular-nums">{formatBase(totalPaidBase, baseCurrency)}</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="font-pixel text-[8px] uppercase text-stone-600 dark:text-stone-400">Total Share (Owed):</span>
+                <span className="font-pixel text-[8px] uppercase text-stone-600 dark:text-stone-400">Total Share (ส่วนตัว):</span>
                 <span className="font-mono text-xs font-semibold text-stone-700 dark:text-stone-300 tabular-nums">{formatBase(sharedBase, baseCurrency)}</span>
               </div>
               <div className="flex items-center justify-between border-t border-stone-400 dark:border-stone-600 pt-2">
                 <div className="flex flex-col gap-0.5">
                   <span className="font-pixel text-[10px] uppercase text-stone-800 dark:text-[#fdfbf7]">Net Balance:</span>
-                  <span className="font-pixel text-[8px] uppercase text-stone-500 dark:text-stone-400">
-                    {netBalanceBase > 0.5 ? "เจ้าหนี้ · Creditor" : netBalanceBase < -0.5 ? "ลูกหนี้ · Debtor" : "ลงตัว · Settled"}
-                  </span>
+                  <span className="font-pixel text-[8px] uppercase text-stone-500 dark:text-stone-400">ยอดสุทธิ</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className={`font-mono text-sm font-black tabular-nums ${netBalanceBase > 0.5 ? "text-[#4a7c59] dark:text-emerald-400" : netBalanceBase < -0.5 ? "text-red-700 dark:text-red-400" : "text-stone-500 dark:text-stone-400"}`}>
-                    {netBalanceBase > 0.5 ? "+" : ""}{formatBase(netBalanceBase, baseCurrency)}
-                  </span>
-                  <span className={`border-2 px-2 py-0.5 font-pixel text-[8px] uppercase tracking-wider ${
+                  <span className={`px-2 py-1 font-mono text-[10px] font-bold tracking-wider rounded ${
                     netBalanceBase > 0.5
-                      ? "border-[#4a7c59] bg-[#4a7c59]/10 text-[#2d5a3d] dark:text-emerald-400"
+                      ? "text-emerald-500 bg-emerald-50 dark:bg-emerald-900/30 dark:text-emerald-400"
                       : netBalanceBase < -0.5
-                        ? "border-red-400 bg-red-50 text-red-700 dark:border-red-700 dark:bg-red-900/20 dark:text-red-400"
-                        : "border-stone-400 bg-stone-100 text-stone-600 dark:border-stone-600 dark:bg-stone-800 dark:text-stone-400"
+                        ? "text-rose-500 bg-rose-50 dark:bg-rose-900/30 dark:text-rose-400"
+                        : "text-stone-500 bg-stone-100 dark:bg-stone-800 dark:text-stone-400"
                   }`}>
-                    {netBalanceBase > 0.5 ? "✓ To Receive" : netBalanceBase < -0.5 ? "↑ To Pay" : "✓ Settled"}
+                    {netBalanceBase > 0.5 
+                      ? `ได้รับเงินคืน: +${formatBase(netBalanceBase, baseCurrency)}` 
+                      : netBalanceBase < -0.5 
+                        ? `ต้องจ่ายเงิน: -${formatBase(Math.abs(netBalanceBase), baseCurrency)}` 
+                        : `ยอดลงตัว: ${formatBase(0, baseCurrency)}`}
                   </span>
                 </div>
               </div>
