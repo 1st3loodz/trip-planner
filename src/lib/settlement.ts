@@ -92,6 +92,16 @@ export interface MemberBalance {
   net: number;
 }
 
+const getExpenseAmountTHB = (e: any): number => {
+  if (!e) return 0;
+  if (e.currency === 'THB') return Number(e.amount) || 0;
+  const rate = Number(e.custom_exchange_rate) > 0 
+    ? Number(e.custom_exchange_rate) 
+    : (Number(e.exchange_rate) > 0 && Number(e.exchange_rate) !== 1 ? Number(e.exchange_rate) : (e.currency === 'JPY' ? 0.209096 : 1));
+  const raw = Number(e.foreign_amount) > 0 ? Number(e.foreign_amount) : (Number(e.amount) || 0);
+  return raw * rate;
+};
+
 /**
  * Computes raw per-member net balances using the canonical formula:
  *   net = totalPaid - totalShare
@@ -104,52 +114,38 @@ export function computeMemberBalances(
   participants: Participant[],
 ): MemberBalance[] {
   return participants.map((member) => {
-    let paid = 0;
-    let share = 0;
+    // A. All expenses where this member was the actual payer
+    const totalPaid = expenses
+      .filter(e => {
+        const payerId = String((e as any).paid_by || e.paidById || '').trim();
+        return payerId === member.id;
+      })
+      .reduce((sum, e) => sum + getExpenseAmountTHB(e), 0);
 
-    for (const exp of expenses) {
-      if (exp.isExcluded) continue;
-      const expAmount = parseFloat(exp.amount as any) || 0;
-      if (expAmount <= 0) continue;
-
-      const resolvedPayerId = resolvePayerId(exp, participants);
-
-      // Total bill converted to base currency
-      const totalBillBase = getConvertedAmountTHB(exp);
-
-      // A: Did this member pay the bill up-front?
-      if (resolvedPayerId === member.id) {
-        paid += totalBillBase;
-      }
-
-      // B: What is this member's allocated share?
-      const resolvedSplits = getResolvedSplits(exp, participants);
-      const mySplit = resolvedSplits.find((s) => s.participantId === member.id);
+    // B. All expenses where this member participated in the split
+    const totalShare = expenses.reduce((sum, e) => {
+      const splitList = Array.isArray((e as any).split_members) ? (e as any).split_members : (Array.isArray(e.splits) ? e.splits : []);
+      const isIncluded = splitList.some((s: any) => String(s?.participantId || s?.id || s).trim() === member.id);
       
-      if (mySplit) {
-        let shareBase = 0;
-        if (exp.splitType === 'CUSTOM') {
-          const splitAmt = parseFloat(mySplit.amount as any) || 0;
-          shareBase = exp.foreignAmount !== undefined
-            ? splitAmt
-            : splitAmt * getExchangeRate(exp);
-        } else {
-          // Equal split - calculate exactly as total / count to avoid rounding differences
-          const splitCount = resolvedSplits.length || 1;
-          shareBase = totalBillBase / splitCount;
-        }
-        share += shareBase;
-      }
-    }
+      if (!isIncluded) return sum;
+      
+      const totalTHB = getExpenseAmountTHB(e);
+      const splitCount = splitList.length > 0 ? splitList.length : 1;
+      
+      return sum + (totalTHB / splitCount);
+    }, 0);
 
-    const net = paid - share;
+    // C. Net Balance: Paid - Share
+    // > 0 => Creditor (Receives money)
+    // < 0 => Debtor (Owes money)
+    const netBalance = totalPaid - totalShare;
 
     return {
-      id:    member.id,
-      name:  member.name,
-      paid:  Math.round(paid  * 100) / 100,
-      share: Math.round(share * 100) / 100,
-      net:   Math.round(net   * 100) / 100,
+      id: member.id,
+      name: member.name,
+      paid: Number(totalPaid.toFixed(2)),
+      share: Number(totalShare.toFixed(2)),
+      net: Number(netBalance.toFixed(2)),
     };
   });
 }
@@ -231,30 +227,36 @@ export function computeSettlementsInBase(
   const pairExpenses: Record<string, Record<string, { exp: Expense; amt: number }[]>> = {};
 
   for (const exp of expenses) {
-    // ── 1. Genuine personal/excluded expense — intentional skip ──────────────
     if (exp.isExcluded) continue;
 
-    // ── 2. Guard against zero/negative amounts ───────────────────────────────
-    const expAmount = parseFloat(exp.amount as any) || 0;
-    if (expAmount <= 0) continue;
+    // ── 1. Match payer ───────────────────────────────────────────────────────
+    const payerId = String((exp as any).paid_by || exp.paidById || '').trim();
+    const paidBy = allParticipants.find(p => p.id === payerId)?.id;
+    if (!paidBy) continue; // Payer must exist in participants
 
-    // ── 3. Resolve payer — robust match against participants ──────────────────
-    const paidBy = resolvePayerId(exp, allParticipants);
+    // ── 2. Get Expense Amount in THB ─────────────────────────────────────────
+    const totalTHB = getExpenseAmountTHB(exp);
+    if (totalTHB <= 0) continue;
 
-    // Can't do anything without a valid payer identity
-    if (!paidBy) continue;
+    // ── 3. Resolve splits ────────────────────────────────────────────────────
+    let splitList = Array.isArray((exp as any).split_members) ? (exp as any).split_members : (Array.isArray(exp.splits) ? exp.splits : []);
+    let effectiveSplits: { participantId: string; amount: number; isSettled: boolean }[] = [];
 
-    // ── 4. Resolve splits — synthesize equal splits if missing ───────────────
-    let effectiveSplits = getResolvedSplits(exp, allParticipants);
-
-    if (effectiveSplits.length === 0 && allParticipants.length > 0) {
-      // No splits recorded → distribute equally among everyone
-      const equalShare = expAmount / allParticipants.length;
+    if (splitList.length === 0 && allParticipants.length > 0) {
+      // Synthesize equal splits among all if missing
       effectiveSplits = allParticipants.map(p => ({
         participantId: p.id,
-        amount: parseFloat(equalShare.toFixed(2)),
+        amount: totalTHB / allParticipants.length,
         isSettled: false,
       }));
+    } else {
+      effectiveSplits = splitList
+        .map((s: any) => {
+          const sId = String(s?.participantId || s?.id || s).trim();
+          const pMatch = allParticipants.find(p => p.id === sId);
+          return pMatch ? { participantId: pMatch.id, amount: s.amount || 0, isSettled: !!s.isSettled } : null;
+        })
+        .filter(Boolean) as any;
     }
 
     // ── 5. Count non-self splits — skip if truly solo ────────────────────────
@@ -267,21 +269,22 @@ export function computeSettlementsInBase(
       if (split.participantId === paidBy) continue;
 
       const borrower = split.participantId;
-      if (!borrower || !borrower.trim()) continue; // guard against bad participant IDs
+      if (!borrower || !borrower.trim()) continue;
 
-      const splitAmt = parseFloat(split.amount as any) || 0;
-      
-      // Convert this split's share to base currency
-      // If it's a CUSTOM split, use the split amount (converted if needed).
-      // If it's an EQUAL split, divide the total base bill by the number of splits to avoid rounding errors.
       let shareBase = 0;
       if (exp.splitType === 'CUSTOM') {
-        shareBase = (exp.foreignAmount !== undefined) 
-          ? splitAmt 
-          : splitAmt * getExchangeRate(exp);
+        // If they provided a custom split amount in the original currency, we convert it to base.
+        // But the DB schema says split_members array has amounts.
+        // It's safer to just proportion it if it's custom, or if the amount is already THB.
+        // If split.amount exists and it's already THB, just use it. Otherwise compute proportional:
+        const rate = Number((exp as any).custom_exchange_rate) > 0 
+          ? Number((exp as any).custom_exchange_rate) 
+          : (Number((exp as any).exchange_rate) > 0 && Number((exp as any).exchange_rate) !== 1 ? Number((exp as any).exchange_rate) : (exp.currency === 'JPY' ? 0.209096 : 1));
+        
+        shareBase = exp.foreignAmount !== undefined ? split.amount : split.amount * rate;
       } else {
-        const totalBillBase = getConvertedAmountTHB(exp);
-        shareBase = totalBillBase / effectiveSplits.length;
+        // Equal division of totalTHB
+        shareBase = totalTHB / effectiveSplits.length;
       }
 
       if (shareBase <= 0) continue;
