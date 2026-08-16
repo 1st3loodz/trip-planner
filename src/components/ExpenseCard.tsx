@@ -5,6 +5,7 @@ import { formatCurrency } from "@/lib/utils";
 import { DEFAULT_RATES, getExchangeRate, getConvertedAmountTHB } from "@/lib/currency";
 import Avatar from "@/components/Avatar";
 import { useCurrency } from "@/contexts/CurrencyContext";
+import { resolvePayerId, getResolvedSplits } from "@/lib/settlement";
 
 interface ExpenseCardProps {
   expense: Expense;
@@ -19,12 +20,13 @@ export default function ExpenseCard({ expense, participants, onEdit, onDelete, c
   const customCat = customCategories.find((c) => c.id === expense.category);
   const cat = EXPENSE_CATEGORY_META[expense.category] || { label: customCat?.label || expense.category, emoji: customCat?.emoji || "✨", color: "bg-stone-500/15 text-stone-600 border-stone-500/30 dark:text-stone-300" };
   const cur = CURRENCY_META[expense.currency];
-  const actualPaidById = expense.paidById || (expense as any).paid_by || (expense as any).payer_id || (expense as any).created_by || (expense as any).createdBy;
-  const foundPayer = participants.find((p) => p.id === actualPaidById);
-  const payer = foundPayer || (actualPaidById ? { id: actualPaidById, name: (expense as any).payer?.name || (expense as any).payer?.email || 'Unknown Member', color: 'bg-stone-500 text-white' } : undefined);
-  const safeSplits = Array.isArray(expense?.splits) ? expense.splits : [];
-  const splitMembers = safeSplits.map((s) => participants.find((p) => p.id === s.participantId)).filter(Boolean) as Participant[];
-  const perPerson = safeSplits.length > 0 ? (Number(expense?.amount) || 0) / safeSplits.length : 0;
+  const resolvedPayerId = resolvePayerId(expense, participants);
+  const foundPayer = participants.find((p) => p.id === resolvedPayerId);
+  const payer = foundPayer || { id: resolvedPayerId || 'unknown', name: (expense as any).payer?.name || 'Unknown Member', color: 'bg-stone-500 text-white' };
+  
+  const resolvedSplits = getResolvedSplits(expense, participants);
+  const splitMembers = resolvedSplits.map((s) => participants.find((p) => p.id === s.participantId)).filter(Boolean) as Participant[];
+  const perPerson = resolvedSplits.length > 0 ? (Number(expense?.amount) || 0) / resolvedSplits.length : 0;
   const actualDate = expense.date || (expense as any).expense_date || expense.createdAt || (expense as any).created_at;
   const parsedDate = actualDate ? new Date(actualDate.includes('T') ? actualDate : actualDate + "T00:00:00") : null;
   const dateLabel = parsedDate ? parsedDate.toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" }) : "";
@@ -96,9 +98,10 @@ export default function ExpenseCard({ expense, participants, onEdit, onDelete, c
             <span className="font-mono text-[10px] text-stone-500 dark:text-stone-400">({splitMembers.length} people · {formatCurrency(perPerson, expense.currency)} each)</span>
           )}
         </div>
-        {(expense as any).splitType === 'CUSTOM' && safeSplits.length > 0 && (
-          <div className="ml-1 space-y-0.5">
-            {safeSplits.map((split) => {
+          {/* Custom split indicator */}
+          {resolvedSplits.length > 0 && (expense as any).splitType === 'CUSTOM' && (
+            <div className="ml-1 space-y-0.5">
+              {resolvedSplits.map((split) => {
               const member = participants.find(p => p.id === split.participantId);
               if (!member) return null;
               return (

@@ -1,9 +1,10 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Expense, ExpenseCategory, EXPENSE_CATEGORY_META } from "@/types/trip";
+import { Expense, ExpenseCategory, EXPENSE_CATEGORY_META, Participant } from "@/types/trip";
 import { useCurrency } from "@/contexts/CurrencyContext";
-import { convertToBase, formatBase, getConvertedAmountTHB, getExchangeRate } from "@/lib/currency";
+import { convertToBase, formatBase, getConvertedAmountTHB } from "@/lib/currency";
+import { resolvePayerId } from "@/lib/settlement";
 
 // Category hex colors for the SVG segments (Cozy Theme)
 const CATEGORY_HEX: Record<ExpenseCategory, string> = {
@@ -18,7 +19,8 @@ interface MemberCategoryChartProps {
   memberId: string;
   memberName: string;
   expenses: Expense[];
-  customCategories?: { id: string; label: string; emoji: string }[];
+  participants: Participant[];
+  customCategories?: { id: string; label: string; emoji: string; color?: string }[];
 }
 
 // ── SVG donut helpers ──────────────────────────────────────────────────────
@@ -38,7 +40,7 @@ function donutArc(cx: number, cy: number, OR: number, IR: number, s: number, e: 
   return `M ${ox1.toFixed(2)} ${oy1.toFixed(2)} A ${OR} ${OR} 0 ${lg} 1 ${ox2.toFixed(2)} ${oy2.toFixed(2)} L ${ix1.toFixed(2)} ${iy1.toFixed(2)} A ${IR} ${IR} 0 ${lg} 0 ${ix2.toFixed(2)} ${iy2.toFixed(2)} Z`;
 }
 
-export default function MemberCategoryChart({ memberId, memberName, expenses, customCategories = [] }: MemberCategoryChartProps) {
+export default function MemberCategoryChart({ memberId, memberName, expenses, participants, customCategories = [] }: MemberCategoryChartProps) {
   const { baseCurrency, rates } = useCurrency();
   const [hovered, setHovered] = useState<ExpenseCategory | null>(null);
 
@@ -47,7 +49,7 @@ export default function MemberCategoryChart({ memberId, memberName, expenses, cu
     const totals: Partial<Record<string, number>> = {};
     for (const exp of expenses) {
       const cat = exp?.category?.trim() || "other";
-      const actualPaidById = exp?.paidById || (exp as any)?.paid_by || (exp as any)?.payer_id || (exp as any)?.created_by || (exp as any)?.createdBy;
+      const actualPaidById = resolvePayerId(exp, participants);
       
       if (exp?.isExcluded) {
         if (actualPaidById === memberId) {
@@ -73,7 +75,7 @@ export default function MemberCategoryChart({ memberId, memberName, expenses, cu
   const segments = useMemo(() => {
     let angle = 0;
     const allPresentCats = Array.from(new Set(expenses.filter(e => {
-      const actualPaidById = e?.paidById || (e as any)?.paid_by || (e as any)?.payer_id || (e as any)?.created_by || (e as any)?.createdBy;
+      const actualPaidById = resolvePayerId(e, participants);
       if (e?.isExcluded) return actualPaidById === memberId;
       const split = (e?.splits || []).find((s) => s.participantId === memberId);
       return actualPaidById === memberId || !!split;

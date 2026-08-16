@@ -6,6 +6,7 @@ import { generateId } from "@/lib/utils";
 import { DEFAULT_RATES } from "@/lib/currency";
 import Avatar from "@/components/Avatar";
 import { useCurrency } from "@/contexts/CurrencyContext";
+import { resolvePayerId } from "@/lib/settlement";
 
 interface AddExpenseModalProps {
   participants: Participant[];
@@ -28,7 +29,7 @@ export default function AddExpenseModal({ participants, initialExpense, onSave, 
   const [fetchedRate, setFetchedRate] = useState<number | null>(initialExpense?.historicalRate ?? null);
   const [currency,    setCurrency]    = useState<Currency>(initialExpense?.currency ?? "CNY");
   const [category,    setCategory]    = useState<ExpenseCategory>(initialExpense?.category ?? "food");
-  const actualInitialPayer = initialExpense ? (initialExpense.paidById || (initialExpense as any).paid_by || (initialExpense as any).payer_id || (initialExpense as any).created_by || (initialExpense as any).createdBy) : undefined;
+  const actualInitialPayer = initialExpense ? resolvePayerId(initialExpense, participants) : undefined;
   const [paidById,    setPaidById]    = useState(actualInitialPayer ?? participants[0]?.id ?? "");
   const [dateStr,     setDateStr]     = useState(() => {
     return initialExpense?.date ?? new Date().toISOString().slice(0, 10);

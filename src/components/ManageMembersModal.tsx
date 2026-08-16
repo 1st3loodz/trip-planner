@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { Participant, Expense } from "@/types/trip";
 import { generateId } from "@/lib/utils";
+import { resolvePayerId } from "@/lib/settlement";
 import Avatar from "@/components/Avatar";
 import { createClient } from "@/utils/supabase/client";
 
@@ -47,7 +48,7 @@ export default function ManageMembersModal({
   function getMemberExpenseCount(id: string) {
     return expenses.filter(
       (e) => {
-        const actualPaidById = e.paidById || (e as any).paid_by || (e as any).payer_id || (e as any).created_by || (e as any).createdBy;
+        const actualPaidById = resolvePayerId(e, participants);
         return actualPaidById === id || e.splits.some((s) => s.participantId === id);
       }
     ).length;

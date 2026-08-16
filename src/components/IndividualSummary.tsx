@@ -6,10 +6,10 @@ import {
   EXPENSE_CATEGORY_META, CURRENCY_META, Currency,
 } from "@/types/trip";
 import { useCurrency } from "@/contexts/CurrencyContext";
-import { getExchangeRate, getConvertedAmountTHB } from "@/lib/currency";
+import { getConvertedAmountTHB, getExchangeRate } from "@/lib/currency";
 import { convertToBase, formatBase } from "@/lib/currency";
 import { formatCurrency } from "@/lib/utils";
-import { computeMemberBalances } from "@/lib/settlement";
+import { computeMemberBalances, resolvePayerId } from "@/lib/settlement";
 import Avatar from "@/components/Avatar";
 import MemberCategoryChart from "@/components/MemberCategoryChart";
 
@@ -43,7 +43,7 @@ export default function IndividualSummary({ expenses, participants, customCatego
       
       const totalBillTHB = getConvertedAmountTHB(exp);
         
-      const actualPaidById = exp.paidById || (exp as any).paid_by || (exp as any).payer_id || (exp as any).created_by || (exp as any).createdBy;
+      const actualPaidById = resolvePayerId(exp, participants);
       
       const getShareForeign = (amtBase: number) => isLegacy ? amtBase : amtBase / effectiveRate;
 
@@ -86,7 +86,7 @@ export default function IndividualSummary({ expenses, participants, customCatego
     return Array.from(map.entries())
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([date, items]) => ({ date, items }));
-  }, [expenses, selectedId, baseCurrency, rates]);
+  }, [expenses, selectedId, baseCurrency, rates, participants]);
 
   // ── Apply category filter ──────────────────────────────────────────────────
   const groups = useMemo<DayGroup[]>(() => {
@@ -231,6 +231,7 @@ export default function IndividualSummary({ expenses, participants, customCatego
           memberId={selectedId}
           memberName={member.name}
           expenses={expenses}
+          participants={participants}
           customCategories={customCategories}
         />
       )}
@@ -280,7 +281,7 @@ export default function IndividualSummary({ expenses, participants, customCatego
                     const customCat = customCategories.find(c => c.id === expense.category);
                     const cat      = EXPENSE_CATEGORY_META[expense.category] || { label: customCat?.label || expense.category, emoji: customCat?.emoji || "✨", color: "bg-stone-500/15 text-stone-800" };
                     const cur      = CURRENCY_META[expense.currency];
-                    const actualPaidById = expense.paidById || (expense as any).paid_by || (expense as any).payer_id || (expense as any).created_by || (expense as any).createdBy;
+                    const actualPaidById = resolvePayerId(expense, participants);
                     const isPayer  = actualPaidById === selectedId;
                     
                     const effectiveRate = getExchangeRate(expense);
