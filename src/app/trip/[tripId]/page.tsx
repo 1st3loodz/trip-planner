@@ -383,6 +383,11 @@ export default function TripDetailPage({ params }: { params: Promise<{ tripId: s
           expenses: prev.expenses.map((e: any) => e.id === expenseId ? { ...e, split_members: updatedSplits, splits: updatedSplits } : e)
         };
       });
+
+      // Also update selected expense state if open
+      if (selectedExpenseDetail?.id === expenseId) {
+        setSelectedExpenseDetail((prev: any) => ({ ...prev, split_members: updatedSplits, splits: updatedSplits }));
+      }
     } catch (err) {
       console.error("Error toggling settle status:", err);
     }
@@ -793,13 +798,33 @@ export default function TripDetailPage({ params }: { params: Promise<{ tripId: s
                   };
                   amt = toTHB(selectedExpenseDetail) / splitsLen;
                 }
+                const isSettled = typeof split === 'object' ? split.isSettled : false;
 
                 return (
                   <div key={idx} className="flex justify-between items-center py-2 border-b border-gray-50 last:border-0">
-                    <span className="text-sm text-gray-700">{memberName}</span>
-                    <span className="text-sm font-semibold text-gray-900">
-                      ฿{amt.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                    </span>
+                    <span className={`text-sm ${isSettled ? 'text-gray-400 line-through' : 'text-gray-700'}`}>{memberName}</span>
+                    <div className="flex items-center gap-3">
+                      <span className={`text-sm font-semibold ${isSettled ? 'text-gray-400 line-through' : 'text-gray-900'}`}>
+                        ฿{amt.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                      </span>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleParticipantSettled(selectedExpenseDetail.id, memberId, isSettled);
+                        }}
+                        className={`flex h-5 w-5 items-center justify-center border-2 rounded-md transition-all ${
+                          isSettled
+                            ? "border-[#4a7c59] bg-[#4a7c59] text-[#fdfbf7]"
+                            : "border-gray-300 bg-white hover:border-gray-400"
+                        }`}
+                      >
+                        {isSettled && (
+                          <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="2,6 5,9 10,3" />
+                          </svg>
+                        )}
+                      </button>
+                    </div>
                   </div>
                 );
               })}
