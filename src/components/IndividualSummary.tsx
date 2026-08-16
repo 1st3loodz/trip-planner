@@ -17,6 +17,7 @@ interface IndividualSummaryProps {
   expenses: Expense[];
   participants: Participant[];
   customCategories?: { id: string; label: string; emoji: string }[];
+  onViewExpense?: (e: Expense) => void;
 }
 
 interface LedgerEntry { expense: Expense; share: number; shareBase: number; isPersonal?: boolean; }
@@ -25,7 +26,7 @@ interface DayGroup    { date: string; items: LedgerEntry[]; }
 const ALL_CATEGORY = "all" as const;
 type CatFilter = ExpenseCategory | typeof ALL_CATEGORY;
 
-export default function IndividualSummary({ expenses, participants, customCategories = [] }: IndividualSummaryProps) {
+export default function IndividualSummary({ expenses, participants, customCategories = [], onViewExpense }: IndividualSummaryProps) {
   const { baseCurrency, rates } = useCurrency();
 
   const [selectedId, setSelectedId] = useState<string>(participants[0]?.id ?? "");
@@ -290,7 +291,11 @@ export default function IndividualSummary({ expenses, participants, customCatego
                     const owedBase = isPayer ? Math.max(0, totalBillTHB - shareBase) : 0;
                     
                     return (
-                      <div key={expense.id} className="flex items-center gap-3 px-4 py-3">
+                      <div 
+                        key={expense.id} 
+                        className={`flex items-center gap-3 px-4 py-3 ${onViewExpense ? 'cursor-pointer hover:bg-stone-50 dark:hover:bg-stone-800/50' : ''}`}
+                        onClick={() => onViewExpense?.(expense)}
+                      >
                         <span className="text-base shrink-0">{cat.emoji}</span>
 
                         <div className="flex-1 min-w-0">

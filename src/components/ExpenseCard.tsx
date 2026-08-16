@@ -12,10 +12,11 @@ interface ExpenseCardProps {
   participants: Participant[];
   onEdit: (expense: Expense) => void;
   onDelete: (id: string) => void;
+  onClick?: () => void;
   customCategories?: { id: string; label: string; emoji: string }[];
 }
 
-export default function ExpenseCard({ expense, participants, onEdit, onDelete, customCategories = [] }: ExpenseCardProps) {
+export default function ExpenseCard({ expense, participants, onEdit, onDelete, onClick, customCategories = [] }: ExpenseCardProps) {
   const { baseCurrency } = useCurrency();
   const customCat = customCategories.find((c) => c.id === expense.category);
   const cat = EXPENSE_CATEGORY_META[expense.category] || { label: customCat?.label || expense.category, emoji: customCat?.emoji || "✨", color: "bg-stone-500/15 text-stone-600 border-stone-500/30 dark:text-stone-300" };
@@ -32,7 +33,10 @@ export default function ExpenseCard({ expense, participants, onEdit, onDelete, c
   const dateLabel = parsedDate ? parsedDate.toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" }) : "";
 
   return (
-    <div className={`group border-2 border-stone-400 p-4 transition-all duration-200 hover:border-stone-800 hover:shadow-[4px_4px_0_#292524] dark:border-[#54463d] dark:hover:border-stone-600 dark:hover:shadow-[4px_4px_0_#1e1815] ${expense.isExcluded ? 'bg-stone-200 opacity-70 grayscale-[20%] dark:bg-[#1e1815]' : 'bg-[#fdfbf7] dark:bg-[#28211d]'}`}>
+    <div 
+      onClick={onClick}
+      className={`group border-2 border-stone-400 p-4 transition-all duration-200 hover:border-stone-800 hover:shadow-[4px_4px_0_#292524] dark:border-[#54463d] dark:hover:border-stone-600 dark:hover:shadow-[4px_4px_0_#1e1815] ${expense.isExcluded ? 'bg-stone-200 opacity-70 grayscale-[20%] dark:bg-[#1e1815]' : 'bg-[#fdfbf7] dark:bg-[#28211d]'} ${onClick ? 'cursor-pointer' : ''}`}
+    >
       {/* Top row */}
       <div className="mb-3 flex items-start justify-between gap-3">
         <div className="flex flex-wrap items-center gap-1.5 min-w-0">
@@ -62,11 +66,11 @@ export default function ExpenseCard({ expense, participants, onEdit, onDelete, c
               </span>
             )}
           </div>
-          <button onClick={() => onEdit(expense)} title="Edit expense"
+          <button onClick={(e) => { e.stopPropagation(); onEdit(expense); }} title="Edit expense"
             className="flex h-7 w-7 items-center justify-center border-2 border-stone-300 bg-[#fdfbf7] text-stone-500 opacity-100 transition-all md:opacity-0 md:group-hover:opacity-100 hover:border-stone-800 hover:bg-[#f5eed7] hover:text-stone-800 dark:border-[#54463d] dark:bg-[#28211d] dark:text-stone-500 dark:hover:border-stone-600 dark:hover:bg-[#362d28] dark:hover:text-[#fdfbf7]">
             <PencilIcon />
           </button>
-          <button onClick={() => onDelete(expense.id)} title="Delete expense"
+          <button onClick={(e) => { e.stopPropagation(); onDelete(expense.id); }} title="Delete expense"
             className="flex h-7 w-7 items-center justify-center border-2 border-red-200 bg-red-50 text-red-500 opacity-100 transition-all md:opacity-0 md:group-hover:opacity-100 hover:border-red-400 hover:bg-red-100 hover:text-red-700 dark:border-red-900/50 dark:bg-red-900/20 dark:text-red-400 dark:hover:border-red-800 dark:hover:bg-red-900/40 dark:hover:text-red-300">
             <TrashIcon />
           </button>

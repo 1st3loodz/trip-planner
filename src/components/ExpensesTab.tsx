@@ -12,6 +12,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { useCurrency } from "@/contexts/CurrencyContext";
 import { computeSettlementsInBase } from "@/lib/settlement";
 import ExpenseCard          from "@/components/ExpenseCard";
+import ExpenseDetailModal   from "@/components/ExpenseDetailModal";
 import SettlementCalculator from "@/components/SettlementCalculator";
 import AddExpenseModal       from "@/components/AddExpenseModal";
 import IndividualSummary     from "@/components/IndividualSummary";
@@ -33,7 +34,7 @@ type SortKey   = "date-asc" | "date-desc" | "amount-high" | "amount-low";
 type FilterCat = ExpenseCategory | "all";
 type FilterCur = Currency | "all";
 type Section   = "ledger" | "individual" | "settlement";
-type ModalState = null | { mode: "add" } | { mode: "edit"; expense: Expense };
+type ModalState = null | { mode: "add" } | { mode: "edit"; expense: Expense } | { mode: "detail"; expense: Expense };
 
 export default function ExpensesTab({
   expenses, participants, onAddExpense,  onEditExpense,
@@ -281,6 +282,7 @@ export default function ExpensesTab({
                             {group.expenses.map((exp) => (
                               <ErrorBoundary key={exp.id}>
                                 <ExpenseCard expense={exp} participants={participants} customCategories={customCategories}
+                                  onClick={() => setModalState({ mode: "detail", expense: exp })}
                                   onEdit={(e) => setModalState({ mode: "edit", expense: e })}
                                   onDelete={(id) => setExpenseToDelete(id)} />
                               </ErrorBoundary>
@@ -315,7 +317,12 @@ export default function ExpensesTab({
               Per-member ledger grouped by date. Amounts shown in original currency + converted to {baseMeta.flag} {baseCurrency}.
             </p>
           </div>
-          <IndividualSummary expenses={expenses} participants={participants} customCategories={customCategories} />
+          <IndividualSummary 
+            expenses={expenses} 
+            participants={participants} 
+            customCategories={customCategories} 
+            onViewExpense={(e) => setModalState({ mode: "detail", expense: e })} 
+          />
         </div>
       )}
 
@@ -342,7 +349,7 @@ export default function ExpensesTab({
       )}
 
       {/* Modal */}
-      {modalState !== null && (
+      {modalState?.mode === "add" || modalState?.mode === "edit" ? (
         <AddExpenseModal
           participants={participants}
           initialExpense={modalState.mode === "edit" ? modalState.expense : undefined}
@@ -350,6 +357,16 @@ export default function ExpensesTab({
           onClose={() => setModalState(null)}
           customCategories={customCategories}
           onAddCustomCategory={onAddCustomCategory}
+        />
+      ) : null}
+
+      {/* Detail Modal */}
+      {modalState?.mode === "detail" && (
+        <ExpenseDetailModal
+          expense={modalState.expense}
+          participants={participants}
+          onClose={() => setModalState(null)}
+          customCategories={customCategories}
         />
       )}
 
