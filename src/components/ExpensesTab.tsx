@@ -329,6 +329,34 @@ export default function ExpensesTab({
           <p className="mb-4 font-mono text-[9px] text-stone-500 dark:text-stone-400">
             Using your exchange rates: 1 CNY = {rates.CNY} {baseCurrency} · 1 JPY = {rates.JPY} {baseCurrency} · 1 USD = {rates.USD} {baseCurrency}
           </p>
+          
+          <div className="p-3 mb-4 bg-gray-900 text-green-400 text-xs font-mono rounded overflow-x-auto">
+            <p className="font-bold text-white mb-1">🛠️ DEBUG: Members & Expenses Data</p>
+            <details>
+              <summary className="cursor-pointer text-yellow-300">Click to expand Raw JSON</summary>
+              <div className="mt-2 space-y-2">
+                <div>
+                  <p className="text-white font-semibold">Members:</p>
+                  <pre>{JSON.stringify(participants?.map(m => ({ id: m.id, name: m.name, user_id: (m as any).user_id })), null, 2)}</pre>
+                </div>
+                <div>
+                  <p className="text-white font-semibold">Expenses (First 3):</p>
+                  <pre>{JSON.stringify(expenses?.slice(0, 3)?.map(e => ({
+                    title: (e as any).title || e.description,
+                    amount: e.amount,
+                    foreign_amount: e.foreignAmount || (e as any).foreign_amount,
+                    currency: e.currency,
+                    exchange_rate: e.exchangeRate || (e as any).exchange_rate,
+                    custom_exchange_rate: (e as any).custom_exchange_rate,
+                    paid_by: (e as any).paid_by || e.paidById,
+                    payer_id: (e as any).payer_id,
+                    split_members: (e as any).split_members || e.splits
+                  })), null, 2)}</pre>
+                </div>
+              </div>
+            </details>
+          </div>
+
           <SettlementCalculator
             settlements={settlements}
             participants={participants}
