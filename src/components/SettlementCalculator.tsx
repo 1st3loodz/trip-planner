@@ -412,7 +412,7 @@ export default function SettlementCalculator({ settlements, participants, onEdit
                                         )}
                                       </button>
 
-                                      <span className="w-4 shrink-0 text-center font-bold text-stone-400">
+                                      <span className={`w-4 shrink-0 text-center font-bold ${inv.isCredit ? 'text-stone-400 dark:text-stone-500' : 'text-red-600 dark:text-red-400'}`}>
                                         {inv.isCredit ? "−" : "+"}
                                       </span>
                                       <span className="shrink-0 text-sm">{cat.emoji}</span>
@@ -426,11 +426,11 @@ export default function SettlementCalculator({ settlements, participants, onEdit
                                         </span>
                                         <span className="text-[9px] text-stone-500 dark:text-stone-400">
                                           {inv.isCredit
-                                            ? `${debtorName} paid, ${toName} shared`
-                                            : `${toName} paid, ${debtorName} owes`}
+                                            ? `${toName} paid → ${debtorName} shared (credit offset)`
+                                            : `${toName} paid → ${debtorName} owes`}
                                         </span>
                                       </div>
-                                      <span className={`shrink-0 tabular-nums font-bold transition-all duration-300 ${isSubSettled ? "line-through text-stone-400 dark:text-stone-600" : (inv.isCredit ? "text-red-700 dark:text-red-400" : "text-[#4a7c59] dark:text-[#2d5a3d]")}`}>
+                                      <span className={`shrink-0 tabular-nums font-bold transition-all duration-300 ${isSubSettled ? "line-through text-stone-400 dark:text-stone-600" : (inv.isCredit ? "text-stone-500 dark:text-stone-400" : "text-red-700 dark:text-red-400")}`}>
                                         {formatCurrency(expAmt, s.currency)}
                                       </span>
                                     </div>

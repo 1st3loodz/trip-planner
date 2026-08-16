@@ -117,6 +117,29 @@ export default function IndividualSummary({ expenses, participants, customCatego
     return { sharedBase: shared, personalBase: personal, combinedBase: shared + personal };
   }, [groups]);
 
+  // ── Net balance: totalPaid - totalShare (across ALL expenses, unfiltered) ──
+  const { totalPaidBase, netBalanceBase } = useMemo(() => {
+    let paid = 0;
+    let share = 0;
+    for (const exp of expenses) {
+      if (exp.isExcluded) continue;
+      const totalBill = getConvertedAmountTHB(exp);
+      const actualPaidById = exp.paidById || (exp as any).paid_by || (exp as any).payer_id || (exp as any).created_by;
+      if (actualPaidById === selectedId) paid += totalBill;
+      const mySplit = exp.splits?.find(s => s.participantId === selectedId);
+      if (mySplit) {
+        if (exp.splitType === 'CUSTOM') {
+          const rate = getExchangeRate(exp);
+          const isLegacy = exp.foreignAmount === undefined && exp.currency !== baseCurrency;
+          share += isLegacy ? Number(mySplit.amount) * rate : Number(mySplit.amount);
+        } else {
+          share += totalBill / (exp.splits?.length || 1);
+        }
+      }
+    }
+    return { totalPaidBase: paid, netBalanceBase: paid - share };
+  }, [expenses, selectedId, baseCurrency, rates]);
+
   function formatDate(isoDate: string) {
     return new Date(isoDate + "T00:00:00").toLocaleDateString("en-US", {
       weekday: "long", year: "numeric", month: "long", day: "numeric",
@@ -404,6 +427,40 @@ export default function IndividualSummary({ expenses, participants, customCatego
                 <span className="font-mono text-lg font-black tabular-nums text-emerald-700 dark:text-emerald-400">
                   {formatBase(combinedBase, baseCurrency)}
                 </span>
+              </div>
+            </div>
+
+            {/* ── Net Balance: เจ้าหนี้ / ลูกหนี้ badge ── */}
+            <div className="mt-4 border-t-2 border-stone-800 pt-3 dark:border-[#54463d] space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="font-pixel text-[8px] uppercase text-stone-600 dark:text-stone-400">Total Paid (Front):</span>
+                <span className="font-mono text-xs font-semibold text-stone-700 dark:text-stone-300 tabular-nums">{formatBase(totalPaidBase, baseCurrency)}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="font-pixel text-[8px] uppercase text-stone-600 dark:text-stone-400">Total Share (Owed):</span>
+                <span className="font-mono text-xs font-semibold text-stone-700 dark:text-stone-300 tabular-nums">{formatBase(sharedBase, baseCurrency)}</span>
+              </div>
+              <div className="flex items-center justify-between border-t border-stone-400 dark:border-stone-600 pt-2">
+                <div className="flex flex-col gap-0.5">
+                  <span className="font-pixel text-[10px] uppercase text-stone-800 dark:text-[#fdfbf7]">Net Balance:</span>
+                  <span className="font-pixel text-[8px] uppercase text-stone-500 dark:text-stone-400">
+                    {netBalanceBase > 0.5 ? "เจ้าหนี้ · Creditor" : netBalanceBase < -0.5 ? "ลูกหนี้ · Debtor" : "ลงตัว · Settled"}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className={`font-mono text-sm font-black tabular-nums ${netBalanceBase > 0.5 ? "text-[#4a7c59] dark:text-emerald-400" : netBalanceBase < -0.5 ? "text-red-700 dark:text-red-400" : "text-stone-500 dark:text-stone-400"}`}>
+                    {netBalanceBase > 0.5 ? "+" : ""}{formatBase(netBalanceBase, baseCurrency)}
+                  </span>
+                  <span className={`border-2 px-2 py-0.5 font-pixel text-[8px] uppercase tracking-wider ${
+                    netBalanceBase > 0.5
+                      ? "border-[#4a7c59] bg-[#4a7c59]/10 text-[#2d5a3d] dark:text-emerald-400"
+                      : netBalanceBase < -0.5
+                        ? "border-red-400 bg-red-50 text-red-700 dark:border-red-700 dark:bg-red-900/20 dark:text-red-400"
+                        : "border-stone-400 bg-stone-100 text-stone-600 dark:border-stone-600 dark:bg-stone-800 dark:text-stone-400"
+                  }`}>
+                    {netBalanceBase > 0.5 ? "✓ To Receive" : netBalanceBase < -0.5 ? "↑ To Pay" : "✓ Settled"}
+                  </span>
+                </div>
               </div>
             </div>
           </div>
