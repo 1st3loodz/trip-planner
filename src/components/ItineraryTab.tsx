@@ -165,43 +165,44 @@ export default function ItineraryTab({ trip, onAddActivity, onEditActivity, onDe
       )}
 
       {visibleDays.length > 0 ? (
-        <DragDropContext onDragEnd={handleDragEnd}>
-          {isFiltering ? (
-            // Plain list when a category filter is active (no DnD while filtering)
-          visibleDays.map((day, idx) => {
-            try {
-              if (!day) return null;
-              return (
-                <ErrorBoundary key={day?.id || day?.dayNumber || idx}>
-                  <DayCard
-                    day={day}
-                    destination={trip.destination}
-                    tripStartDate={trip.startDate}
-                    defaultOpen={false}
-                    customCategories={customCategories}
-                    onEditActivity={(dayNumber, activity) => setModalState({ mode: "edit", activity, dayNumber })}
-                    onDeleteActivity={onDeleteActivity}
-                  />
-                </ErrorBoundary>
-              );
-            } catch (err) {
-              console.error('Failed to render day card:', day, err);
-              return null;
-            }
-          })
+        isFiltering ? (
+          // ── Static list when a category filter is active ── no DnD at all ──
+          <div className="space-y-0">
+            {visibleDays.map((day, idx) => {
+              try {
+                if (!day) return null;
+                return (
+                  <ErrorBoundary key={day?.id || day?.dayNumber || idx}>
+                    <DayCard
+                      day={day}
+                      destination={trip.destination}
+                      tripStartDate={trip.startDate}
+                      defaultOpen={false}
+                      customCategories={customCategories}
+                      isStaticMode={true}
+                      onEditActivity={(dayNumber, activity) => setModalState({ mode: "edit", activity, dayNumber })}
+                      onDeleteActivity={onDeleteActivity}
+                    />
+                  </ErrorBoundary>
+                );
+              } catch (err) {
+                console.error('Failed to render day card:', day, err);
+                return null;
+              }
+            })}
+          </div>
         ) : (
-          <Droppable droppableId="days-list" type="day">
+          // ── Drag-and-drop list when no filter is active ──
+          <DragDropContext onDragEnd={handleDragEnd}>
+            <Droppable droppableId="days-list" type="day">
               {(provided) => (
-                <div
-                  ref={provided.innerRef}
-                  {...provided.droppableProps}
-                >
+                <div ref={provided.innerRef} {...provided.droppableProps}>
                   {visibleDays.map((day, index) => {
                     try {
                       if (!day) return null;
                       return (
                         <ErrorBoundary key={day?.id || day?.dayNumber || index}>
-                          <Draggable draggableId={String(day?.dayNumber || index)} index={index} isDragDisabled={isFiltering}>
+                          <Draggable draggableId={String(day?.dayNumber || index)} index={index}>
                             {(dragProvided, dragSnapshot) => (
                               <div
                                 ref={dragProvided.innerRef}
@@ -212,9 +213,7 @@ export default function ItineraryTab({ trip, onAddActivity, onEditActivity, onDe
                                   transform: dragSnapshot.isDragging
                                     ? `${dragProvided.draggableProps.style?.transform ?? ""} rotate(1.5deg)`
                                     : dragProvided.draggableProps.style?.transform,
-                                  boxShadow: dragSnapshot.isDragging
-                                    ? "6px 6px 0 #292524"
-                                    : undefined,
+                                  boxShadow: dragSnapshot.isDragging ? "6px 6px 0 #292524" : undefined,
                                   zIndex: dragSnapshot.isDragging ? 50 : undefined,
                                 }}
                               >
@@ -224,7 +223,7 @@ export default function ItineraryTab({ trip, onAddActivity, onEditActivity, onDe
                                   tripStartDate={trip.startDate}
                                   defaultOpen={false}
                                   customCategories={customCategories}
-                                  dragHandleProps={isFiltering ? null : dragProvided.dragHandleProps}
+                                  dragHandleProps={dragProvided.dragHandleProps}
                                   onEditActivity={(dayNumber, activity) => setModalState({ mode: "edit", activity, dayNumber })}
                                   onDeleteActivity={onDeleteActivity}
                                 />
@@ -242,8 +241,8 @@ export default function ItineraryTab({ trip, onAddActivity, onEditActivity, onDe
                 </div>
               )}
             </Droppable>
-          )}
-        </DragDropContext>
+          </DragDropContext>
+        )
       ) : (
         <div className="py-16 text-center border-2 border-dashed border-stone-400 bg-stone-200/50 dark:border-stone-600 dark:bg-stone-800/30">
           <div className="mb-2 text-4xl">🔍</div>

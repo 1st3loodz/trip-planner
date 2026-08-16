@@ -15,9 +15,11 @@ interface DayCardProps {
   onEditActivity: (dayNumber: number, activity: ActivityItem) => void;
   onDeleteActivity: (dayNumber: number, activityId: string) => void;
   customCategories?: { id: string; label: string; emoji: string }[];
+  /** When true, renders activities as a plain static list (no drag-and-drop). Use when DragDropContext is not present. */
+  isStaticMode?: boolean;
 }
 
-export default function DayCard({ day, destination, tripStartDate, defaultOpen = true, dragHandleProps, onEditActivity, onDeleteActivity, customCategories = [] }: DayCardProps) {
+export default function DayCard({ day, destination, tripStartDate, defaultOpen = true, dragHandleProps, onEditActivity, onDeleteActivity, customCategories = [], isStaticMode = false }: DayCardProps) {
   const [open, setOpen] = useState(defaultOpen);
 
   // Compute this day's date dynamically from the trip start date + dayNumber offset.
@@ -81,54 +83,82 @@ export default function DayCard({ day, destination, tripStartDate, defaultOpen =
         </button>
       </div>
 
-      {/* Always render the Droppable so collapsed days are valid drop targets */}
-      <Droppable droppableId={String(day.dayNumber)} type="activity">
-        {(provided) => (
-          <div
-            ref={provided.innerRef}
-            {...provided.droppableProps}
-            // When closed: hidden container at height 0, still in DOM for DnD
-            style={open ? undefined : { height: 0, overflow: "hidden", position: "absolute", pointerEvents: "none" }}
-          >
-            {open && (
-              <div className="mt-0 px-5 py-4 bg-[#f5eed7] dark:bg-[#28211d] border-2 border-t-0 border-stone-800 dark:border-[#54463d]">
-                {(!day?.activities || day.activities.length === 0) ? (
-                  <p className="py-4 text-center font-mono text-xs text-amber-700 dark:text-amber-300">No entries yet.</p>
-                ) : (
-                  (Array.isArray(day?.activities) ? day.activities : []).map((act, idx) => (
-                    <Draggable key={act?.id || idx} draggableId={act?.id || String(idx)} index={idx}>
-                      {(dragProvided, dragSnapshot) => (
-                        <div
-                          ref={dragProvided.innerRef}
-                          {...dragProvided.draggableProps}
-                          style={{
-                            ...dragProvided.draggableProps.style,
-                            opacity: dragSnapshot.isDragging ? 0.8 : 1,
-                            zIndex: dragSnapshot.isDragging ? 100 : undefined,
-                          }}
-                        >
-                          <ActivityRow
-                            activity={act}
-                            destination={destination}
-                            isLast={idx === day.activities.length - 1 && !dragSnapshot.isDragging}
-                            dayNumber={day.dayNumber}
-                            tripStartDate={tripStartDate}
-                            customCategories={customCategories}
-                            onEdit={(a) => onEditActivity(day.dayNumber, a)}
-                            onDelete={(id) => onDeleteActivity(day.dayNumber, id)}
-                            dragHandleProps={dragProvided.dragHandleProps}
-                          />
-                        </div>
-                      )}
-                    </Draggable>
-                  ))
-                )}
-              </div>
-            )}
-            {provided.placeholder}
-          </div>
-        )}
-      </Droppable>
+      {/* Activity list — static (no DnD) in filter mode, draggable otherwise */}
+      {isStaticMode ? (
+        // ── Plain static list — no Droppable/Draggable, no dnd context needed ──
+        <div className={open ? undefined : undefined}>
+          {open && (
+            <div className="mt-0 px-5 py-4 bg-[#f5eed7] dark:bg-[#28211d] border-2 border-t-0 border-stone-800 dark:border-[#54463d]">
+              {(!day?.activities || day.activities.length === 0) ? (
+                <p className="py-4 text-center font-mono text-xs text-amber-700 dark:text-amber-300">No entries yet.</p>
+              ) : (
+                (Array.isArray(day?.activities) ? day.activities : []).map((act, idx) => (
+                  <ActivityRow
+                    key={act?.id || idx}
+                    activity={act}
+                    destination={destination}
+                    isLast={idx === day.activities.length - 1}
+                    dayNumber={day.dayNumber}
+                    tripStartDate={tripStartDate}
+                    customCategories={customCategories}
+                    onEdit={(a) => onEditActivity(day.dayNumber, a)}
+                    onDelete={(id) => onDeleteActivity(day.dayNumber, id)}
+                  />
+                ))
+              )}
+            </div>
+          )}
+        </div>
+      ) : (
+        // ── Droppable container — always rendered so collapsed days are valid drop targets ──
+        <Droppable droppableId={String(day.dayNumber)} type="activity">
+          {(provided) => (
+            <div
+              ref={provided.innerRef}
+              {...provided.droppableProps}
+              // When closed: hidden container at height 0, still in DOM for DnD
+              style={open ? undefined : { height: 0, overflow: "hidden", position: "absolute", pointerEvents: "none" }}
+            >
+              {open && (
+                <div className="mt-0 px-5 py-4 bg-[#f5eed7] dark:bg-[#28211d] border-2 border-t-0 border-stone-800 dark:border-[#54463d]">
+                  {(!day?.activities || day.activities.length === 0) ? (
+                    <p className="py-4 text-center font-mono text-xs text-amber-700 dark:text-amber-300">No entries yet.</p>
+                  ) : (
+                    (Array.isArray(day?.activities) ? day.activities : []).map((act, idx) => (
+                      <Draggable key={act?.id || idx} draggableId={act?.id || String(idx)} index={idx}>
+                        {(dragProvided, dragSnapshot) => (
+                          <div
+                            ref={dragProvided.innerRef}
+                            {...dragProvided.draggableProps}
+                            style={{
+                              ...dragProvided.draggableProps.style,
+                              opacity: dragSnapshot.isDragging ? 0.8 : 1,
+                              zIndex: dragSnapshot.isDragging ? 100 : undefined,
+                            }}
+                          >
+                            <ActivityRow
+                              activity={act}
+                              destination={destination}
+                              isLast={idx === day.activities.length - 1 && !dragSnapshot.isDragging}
+                              dayNumber={day.dayNumber}
+                              tripStartDate={tripStartDate}
+                              customCategories={customCategories}
+                              onEdit={(a) => onEditActivity(day.dayNumber, a)}
+                              onDelete={(id) => onDeleteActivity(day.dayNumber, id)}
+                              dragHandleProps={dragProvided.dragHandleProps}
+                            />
+                          </div>
+                        )}
+                      </Draggable>
+                    ))
+                  )}
+                </div>
+              )}
+              {provided.placeholder}
+            </div>
+          )}
+        </Droppable>
+      )}
     </section>
   );
 }
