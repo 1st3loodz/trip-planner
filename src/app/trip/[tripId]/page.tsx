@@ -41,7 +41,7 @@ export default function TripDetailPage({ params }: { params: Promise<{ tripId: s
 
   // Explicit Local State Dispatchers that govern the visible UI
   const [localTrip,          setLocalTrip]          = useState<Trip | undefined>(contextTrip);
-  const [activeTab,          setActiveTab]          = useState<"itinerary" | "expenses">("itinerary");
+  const [activeTab,          setActiveTab]          = useState<"itinerary" | "expenses" | "settlement_v2">("itinerary");
   const [showMembersModal,   setShowMembersModal]   = useState(false);
   const [refreshToggle,      setRefreshToggle]      = useState(0);
   const [activityToDelete,   setActivityToDelete]   = useState<{dayNumber: number; activityId: string; title: string} | null>(null);
@@ -425,7 +425,7 @@ export default function TripDetailPage({ params }: { params: Promise<{ tripId: s
             onAddCustomCategory={handleAddCustomCategory}
             setRefreshToggle={setRefreshToggle}
           />
-        ) : (
+        ) : activeTab === "expenses" ? (
           <ExpensesTab
             expenses={trip.expenses}
             participants={trip.participants}
@@ -437,7 +437,143 @@ export default function TripDetailPage({ params }: { params: Promise<{ tripId: s
             onAddCustomCategory={handleAddCustomCategory}
             isGroupTrip={isGroupTrip}
           />
-        )}
+        ) : activeTab === "settlement_v2" ? (
+          <div className="space-y-6 pb-20">
+            {/* 1. Debug / Verified Header */}
+            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-blue-900 text-sm">
+              <h3 className="font-bold text-base mb-1">⚡ Settlement System #2 (Fresh Engine)</h3>
+              <p className="text-xs text-blue-700">ระบบคำนวณแยกอิสระ แมป participantId ตรงจากฐานข้อมูล</p>
+            </div>
+
+            {/* 2. Calculation Logic */}
+            {(() => {
+              const members = trip.participants;
+              const expenses = trip.expenses;
+
+              // Helper: Convert to THB
+              const toTHB = (e: any): number => {
+                if (!e) return 0;
+                if (e.currency === 'THB' || !e.currency) return Number(e.amount) || 0;
+                const rate = Number(e.custom_exchange_rate) > 0 
+                  ? Number(e.custom_exchange_rate) 
+                  : (Number(e.exchange_rate) > 0 && Number(e.exchange_rate) !== 1 ? Number(e.exchange_rate) : 0.209096);
+                const raw = Number(e.foreign_amount) > 0 ? Number(e.foreign_amount) : (Number(e.amount) || 0);
+                return raw * rate;
+              };
+
+              // Balance Computation
+              const balances = (members || []).map((member) => {
+                const mId = String(member.id).trim();
+
+                // Paid
+                const totalPaid = (expenses || [])
+                  .filter((e: any) => String(e.paid_by || e.paidById || e.payer_id || '').trim() === mId)
+                  .reduce((sum, e) => sum + toTHB(e), 0);
+
+                // Share
+                const totalShare = (expenses || []).reduce((sum, e: any) => {
+                  const splits = Array.isArray(e.split_members) ? e.split_members : (Array.isArray(e.splits) ? e.splits : []);
+                  const mySplit = splits.find((s: any) => String(s?.participantId || s?.id || s).trim() === mId);
+                  if (!mySplit) return sum;
+
+                  if (typeof mySplit === 'object' && mySplit.amount !== undefined) {
+                    const rate = (e.currency !== 'THB' && e.currency) 
+                      ? (Number(e.custom_exchange_rate) || Number(e.exchange_rate) || 0.209096) 
+                      : 1;
+                    return sum + (Number(mySplit.amount) * rate);
+                  }
+                  return sum + (toTHB(e) / (splits.length || 1));
+                }, 0);
+
+                const net = Math.round((totalPaid - totalShare) * 100) / 100;
+
+                return {
+                  id: mId,
+                  name: member.name,
+                  paid: Math.round(totalPaid * 100) / 100,
+                  share: Math.round(totalShare * 100) / 100,
+                  net: net,
+                };
+              });
+
+              // Transfers (Debtor -> Creditor)
+              let debtors = balances.filter((b) => b.net < -0.01).map((b) => ({ ...b, remaining: Math.abs(b.net) }));
+              let creditors = balances.filter((b) => b.net > 0.01).map((b) => ({ ...b, remaining: b.net }));
+              const transfers: Array<{ from: string; to: string; amount: number }> = [];
+
+              for (const d of debtors) {
+                for (const c of creditors) {
+                  if (d.remaining <= 0.01 || c.remaining <= 0.01) continue;
+                  const settleAmt = Math.min(d.remaining, c.remaining);
+                  d.remaining -= settleAmt;
+                  c.remaining -= settleAmt;
+                  transfers.push({
+                    from: d.name,
+                    to: c.name,
+                    amount: Math.round(settleAmt * 100) / 100,
+                  });
+                }
+              }
+
+              return (
+                <div className="space-y-4">
+                  {/* Transfer Plan */}
+                  <div className="bg-white rounded-2xl p-5 border shadow-sm">
+                    <h4 className="font-semibold text-gray-800 text-sm mb-3">💸 แผนการโอนเงิน (Transfer Plan)</h4>
+                    {transfers.length === 0 ? (
+                      <p className="text-gray-500 text-sm text-center py-3">ยอดเคลียร์ครบถ้วนแล้ว 🎉</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {transfers.map((t, idx) => (
+                          <div key={idx} className="flex items-center justify-between p-3 bg-amber-50 rounded-xl border border-amber-100 text-sm">
+                            <span className="font-medium text-amber-950">
+                              <strong>{t.from}</strong> 👉 โอนให้ 👉 <strong>{t.to}</strong>
+                            </span>
+                            <span className="font-bold text-amber-900">
+                              ฿{t.amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Member Balances */}
+                  <div className="grid grid-cols-1 gap-3">
+                    {balances.map((b) => {
+                      const isCreditor = b.net > 0.01;
+                      const isDebtor = b.net < -0.01;
+
+                      return (
+                        <div key={b.id} className="bg-white rounded-2xl p-4 border shadow-sm space-y-2">
+                          <div className="flex justify-between items-center">
+                            <span className="font-bold text-gray-900">{b.name}</span>
+                            <span className={`text-xs px-3 py-1 rounded-full font-semibold ${
+                              isCreditor 
+                                ? 'bg-emerald-50 text-emerald-600 border border-emerald-200' 
+                                : isDebtor 
+                                ? 'bg-rose-50 text-rose-600 border border-rose-200' 
+                                : 'bg-gray-100 text-gray-600'
+                            }`}>
+                              {isCreditor && `ได้รับเงินคืน: +฿${b.net.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
+                              {isDebtor && `ต้องจ่ายเงิน: -฿${Math.abs(b.net).toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
+                              {!isCreditor && !isDebtor && 'ยอดลงตัว: ฿0.00'}
+                            </span>
+                          </div>
+
+                          <div className="flex justify-between text-xs text-gray-500 pt-2 border-t">
+                            <span>จ่ายไป: <strong className="text-gray-800 font-semibold">฿{b.paid.toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong></span>
+                            <span>ส่วนตัว: <strong className="text-gray-800 font-semibold">฿{b.share.toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong></span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+        ) : null}
       </div>
 
       {/* Manage Members Modal */}
