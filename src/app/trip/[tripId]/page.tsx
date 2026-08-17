@@ -347,6 +347,17 @@ export default function TripDetailPage({ params }: { params: Promise<{ tripId: s
     await updateTrip(trip.id, { days: newDays });
   }, [trip, updateTrip, setLocalTrip]);
 
+  const [expandedExpenses, setExpandedExpenses] = useState<Set<string>>(new Set());
+
+  const toggleExpandExpense = (id: string) => {
+    setExpandedExpenses(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
   const handleToggleSettle = async (expenseId: string, participantId: string, currentStatus: boolean) => {
     if (!trip) return;
     try {
@@ -669,27 +680,76 @@ export default function TripDetailPage({ params }: { params: Promise<{ tripId: s
                         const splitCount = Array.isArray(expense.split_members || expense.splits) ? (expense.split_members || expense.splits).length : 1;
 
                         return (
-                          <div
-                            key={expense.id}
-                            onClick={() => setSelectedExpenseDetail(expense)}
-                            className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100 hover:bg-gray-100 cursor-pointer transition-colors"
-                          >
-                            <div className="flex flex-col">
-                              <span className="font-semibold text-gray-800 text-sm">{expense.title || expense.description || 'Expense'}</span>
-                              <span className="text-xs text-gray-500">
-                                จ่ายโดย {payer} • หาร {splitCount} คน
-                              </span>
-                            </div>
-                            <div className="flex flex-col items-end">
-                              <span className="font-bold text-gray-900">
-                                ฿{thbAmt.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                              </span>
-                              {isForeign && (
-                                <span className="text-[10px] text-gray-400">
-                                  {Number(expense.foreign_amount || expense.foreignAmount || expense.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })} {expense.currency}
+                          <div key={expense.id} className="bg-gray-50 rounded-xl border border-gray-100 overflow-hidden hover:bg-gray-100 transition-colors">
+                            <div
+                              onClick={() => toggleExpandExpense(expense.id)}
+                              className="flex items-center justify-between p-3 cursor-pointer"
+                            >
+                              <div className="flex flex-col">
+                                <span className="font-semibold text-gray-800 text-sm">{expense.title || expense.description || 'Expense'}</span>
+                                <span className="text-xs text-gray-500">
+                                  จ่ายโดย {payer} • หาร {splitCount} คน
                                 </span>
-                              )}
+                              </div>
+                              <div className="flex flex-col items-end">
+                                <span className="font-bold text-gray-900">
+                                  ฿{thbAmt.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                </span>
+                                {isForeign && (
+                                  <span className="text-[10px] text-gray-400">
+                                    {Number(expense.foreign_amount || expense.foreignAmount || expense.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })} {expense.currency}
+                                  </span>
+                                )}
+                              </div>
                             </div>
+                            
+                            {/* Expanded Splits View */}
+                            {expandedExpenses.has(expense.id) && (
+                              <div className="border-t border-gray-100 bg-white p-3 space-y-2">
+                                <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Split Breakdown</h4>
+                                {(expense.split_members || expense.splits || []).map((split: any, idx: number) => {
+                                  const memberId = String(split.participantId || split.id || split).trim();
+                                  const memberName = members?.find(m => String(m.id).trim() === memberId)?.name || 'Member';
+                                  
+                                  let amt = 0;
+                                  if (typeof split === 'object' && split.amount !== undefined) {
+                                    const rate = (expense.currency !== 'THB' && expense.currency) 
+                                      ? (Number(expense.custom_exchange_rate) || Number(expense.exchange_rate) || 0.209096) 
+                                      : 1;
+                                    amt = Number(split.amount) * rate;
+                                  } else {
+                                    const splitsLen = (expense.split_members || expense.splits || []).length || 1;
+                                    amt = toTHB(expense) / splitsLen;
+                                  }
+                                  
+                                  const isSettled = typeof split === 'object' ? split.isSettled : false;
+
+                                  return (
+                                    <div key={idx} className="flex justify-between items-center py-2 border-b border-gray-50 last:border-0">
+                                      <span className={`text-sm ${isSettled ? 'text-gray-400 line-through' : 'text-gray-700'}`}>{memberName}</span>
+                                      <div className="flex items-center gap-3">
+                                        <span className={`text-sm font-semibold ${isSettled ? 'text-gray-400 line-through' : 'text-gray-900'}`}>
+                                          ฿{amt.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                        </span>
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleToggleSettle(expense.id, memberId, isSettled);
+                                          }}
+                                          className={`flex px-2 py-1 items-center justify-center border rounded-md transition-all text-xs font-medium ${
+                                            isSettled
+                                              ? "border-[#4a7c59] bg-[#4a7c59] text-[#fdfbf7]"
+                                              : "border-gray-300 bg-white hover:border-gray-400 text-gray-700"
+                                          }`}
+                                        >
+                                          {isSettled ? '✅ เคลียร์แล้ว' : '⚪ กดเคลียร์'}
+                                        </button>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
                           </div>
                         );
                       })}
