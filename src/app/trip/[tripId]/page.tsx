@@ -597,45 +597,49 @@ export default function TripDetailPage({ params }: { params: Promise<{ tripId: s
                     )}
                   </div>
 
-                  {/* Member Balances */}
+                  {/* Member Balances (Debtors Only) */}
                   <div className="grid grid-cols-1 gap-3">
-                    {balances.map((b) => {
-                      const isCreditor = b.net > 0.01;
-                      const isDebtor = b.net < -0.01;
-
-                      return (
-                        <div 
-                          key={b.id} 
-                          onClick={() => setInspectedMember(b)}
-                          className="bg-white rounded-2xl p-4 border shadow-sm space-y-2 cursor-pointer hover:border-blue-400 hover:shadow-md transition-all"
-                        >
-                          <div className="flex justify-between items-center">
-                            <span className="font-bold text-gray-900">{b.name}</span>
-                            <span className={`text-xs px-3 py-1 rounded-full font-semibold ${
-                              isCreditor 
-                                ? 'bg-emerald-50 text-emerald-600 border border-emerald-200' 
-                                : isDebtor 
-                                ? 'bg-rose-50 text-rose-600 border border-rose-200' 
-                                : 'bg-gray-100 text-gray-600'
-                            }`}>
-                              {isCreditor && `ได้รับเงินคืน: +฿${b.net.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
-                              {isDebtor && `ต้องจ่ายเงิน: -฿${Math.abs(b.net).toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
-                              {!isCreditor && !isDebtor && 'ยอดลงตัว: ฿0.00'}
-                            </span>
-                          </div>
-
-                          <div className="flex justify-between text-xs text-gray-500 pt-2 border-t items-center">
-                            <div className="flex gap-4">
-                              <span>จ่ายไป: <strong className="text-gray-800 font-semibold">฿{b.paid.toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong></span>
-                              <span>ส่วนตัว: <strong className="text-gray-800 font-semibold">฿{b.share.toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong></span>
+                    {balances.filter((b) => b.net < -0.01).length === 0 ? (
+                      <p className="text-gray-500 text-sm text-center py-3 bg-white rounded-xl border border-dashed border-gray-300">ทุกคนเคลียร์ยอดครบถ้วนแล้ว ไม่มีหนี้ค้างชำระ 🎉</p>
+                    ) : (
+                      balances.filter((b) => b.net < -0.01).map((b) => {
+                        return (
+                          <div 
+                            key={b.id} 
+                            onClick={() => setInspectedMember(b)}
+                            className="bg-white rounded-2xl p-4 border shadow-sm cursor-pointer hover:border-blue-400 hover:shadow-md transition-all"
+                          >
+                            <div className="flex justify-between items-center mb-3">
+                              <span className="font-bold text-gray-900">{b.name}</span>
+                              <span className="text-xs px-3 py-1 rounded-full font-semibold bg-rose-50 text-rose-600 border border-rose-200">
+                                ต้องจ่ายเงิน: ฿{Math.abs(b.net).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                              </span>
                             </div>
-                            <span className="text-blue-500 font-medium hover:text-blue-700 flex items-center gap-1">
-                              🔍 ดูประวัติ
-                            </span>
+
+                            <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs space-y-1.5 mb-2">
+                              <div className="flex justify-between text-slate-600">
+                                <span>+ ยอดสำรองจ่ายไป (Paid):</span>
+                                <span className="font-semibold text-emerald-600">+฿{b.paid.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                              </div>
+                              <div className="flex justify-between text-slate-600">
+                                <span>- ยอดส่วนตัวที่ร่วมหาร (Share):</span>
+                                <span className="font-semibold text-rose-600">-฿{b.share.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                              </div>
+                              <div className="flex justify-between pt-1.5 border-t border-slate-200 font-bold text-gray-900">
+                                <span>= ยอดสุทธิที่ต้องโอนชำระ (Net):</span>
+                                <span className="text-rose-600">-฿{Math.abs(b.net).toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                              </div>
+                            </div>
+
+                            <div className="flex justify-end text-xs">
+                              <span className="text-blue-500 font-medium hover:text-blue-700 flex items-center gap-1">
+                                🔍 ดูประวัติ
+                              </span>
+                            </div>
                           </div>
-                        </div>
-                      );
-                    })}
+                        );
+                      })
+                    )}
                   </div>
 
                   {/* Expense Breakdown List */}
