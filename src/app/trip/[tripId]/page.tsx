@@ -393,6 +393,19 @@ export default function TripDetailPage({ params }: { params: Promise<{ tripId: s
     }
   };
 
+  const isSharedExpense = (e: any): boolean => {
+    const splits = e.split_members || e.splits || [];
+    if (!e || !Array.isArray(splits) || splits.length === 0) return false;
+    const payerId = String(e.paid_by || e.paidById || e.payer_id || '').trim();
+    
+    // If split among multiple people -> Definitely shared
+    if (splits.length > 1) return true;
+
+    // If split with 1 person, but that person is NOT the payer -> It's a debt/shared
+    const singleParticipantId = String(splits[0]?.participantId || splits[0]?.id || splits[0] || '').trim();
+    return singleParticipantId !== payerId;
+  };
+
   if (!isLoaded) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#f4ecd8] dark:bg-[#28211d]">
@@ -496,7 +509,7 @@ export default function TripDetailPage({ params }: { params: Promise<{ tripId: s
             {/* 2. Calculation Logic */}
             {(() => {
               const members = trip.participants;
-              const expenses = trip.expenses;
+              const expenses = (trip.expenses || []).filter(isSharedExpense);
 
               // Helper: Convert to THB
               const toTHB = (e: any): number => {
@@ -882,10 +895,14 @@ export default function TripDetailPage({ params }: { params: Promise<{ tripId: s
               };
 
               // Paid Out-of-Pocket
-              const paidExpenses = (trip.expenses || []).filter((e: any) => String(e.paid_by || e.paidById || e.payer_id || '').trim() === mId);
+              const paidExpenses = (trip.expenses || [])
+                .filter(isSharedExpense)
+                .filter((e: any) => String(e.paid_by || e.paidById || e.payer_id || '').trim() === mId);
               
               // Consumed Share
-              const sharedExpenses = (trip.expenses || []).map((e: any) => {
+              const sharedExpenses = (trip.expenses || [])
+                .filter(isSharedExpense)
+                .map((e: any) => {
                 const splits = Array.isArray(e.split_members) ? e.split_members : (Array.isArray(e.splits) ? e.splits : []);
                 const mySplit = splits.find((s: any) => String(s?.participantId || s?.id || s).trim() === mId);
                 if (!mySplit) return null;
