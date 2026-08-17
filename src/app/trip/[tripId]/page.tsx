@@ -41,7 +41,7 @@ export default function TripDetailPage({ params }: { params: Promise<{ tripId: s
 
   // Explicit Local State Dispatchers that govern the visible UI
   const [localTrip,          setLocalTrip]          = useState<Trip | undefined>(contextTrip);
-  const [activeTab,          setActiveTab]          = useState<"itinerary" | "expenses" | "settlement_v2">("itinerary");
+  const [activeTab,          setActiveTab]          = useState<"itinerary" | "expenses" | "settlement">("itinerary");
   const [showMembersModal,   setShowMembersModal]   = useState(false);
   const [refreshToggle,      setRefreshToggle]      = useState(0);
   const [activityToDelete,   setActivityToDelete]   = useState<{dayNumber: number; activityId: string; title: string} | null>(null);
@@ -495,13 +495,8 @@ export default function TripDetailPage({ params }: { params: Promise<{ tripId: s
             onAddCustomCategory={handleAddCustomCategory}
             isGroupTrip={isGroupTrip}
           />
-        ) : activeTab === "settlement_v2" ? (
+        ) : activeTab === "settlement" ? (
           <div className="space-y-6 pb-20">
-            {/* 1. Debug / Verified Header */}
-            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-blue-900 text-sm">
-              <h3 className="font-bold text-base mb-1">⚡ Settlement System #2 (Fresh Engine)</h3>
-              <p className="text-xs text-blue-700">ระบบคำนวณแยกอิสระ แมป participantId ตรงจากฐานข้อมูล</p>
-            </div>
 
             {/* 2. Calculation Logic */}
             {(() => {

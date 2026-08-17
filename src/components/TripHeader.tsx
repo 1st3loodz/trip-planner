@@ -10,8 +10,8 @@ import { exportTripToExcel } from "@/lib/exportExcel";
 
 interface TripHeaderProps {
   trip: Trip;
-  activeTab: "itinerary" | "expenses" | "settlement_v2";
-  onTabChange: (tab: "itinerary" | "expenses" | "settlement_v2") => void;
+  activeTab: "itinerary" | "expenses" | "settlement";
+  onTabChange: (tab: "itinerary" | "expenses" | "settlement") => void;
   onManageMembers: () => void;
   onRefreshRequest: () => void;
 }
@@ -279,7 +279,7 @@ export default function TripHeader({ trip, activeTab, onTabChange, onManageMembe
           {([
             { key: "itinerary",  label: "🗓 Journal"    },
             { key: "expenses",   label: "💰 Gold Ledger" },
-            { key: "settlement_v2", label: "เคลียร์เงิน #2" },
+            { key: "settlement", label: "⚖️ Settlement" },
           ] as const).map(({ key, label }) => (
             <button
               key={key}
