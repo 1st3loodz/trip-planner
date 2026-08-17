@@ -90,6 +90,9 @@ export interface Expense {
   createdAt: string;
   /** Exclude from total trip cost and settlements */
   isExcluded?: boolean;
+  /** Overall settlement status for the entire expense */
+  isSettled?: boolean;
+  is_settled?: boolean;
   /** Frozen live FX rate at the moment of creation */
   historicalRate?: number;
   /** Frozen base currency amount at the moment of creation */

@@ -225,41 +225,27 @@ export default function TripDetailPage({ params }: { params: Promise<{ tripId: s
     await updateTrip(trip.id, { days: newDays });
   }, [trip, updateTrip]);
 
-  const handleToggleSettle = async (expenseId: string, participantId: string, currentStatus: boolean) => {
+  const handleToggleExpenseSettle = async (expenseId: string, currentStatus: boolean) => {
     if (!trip) return;
     try {
-      const expense: any = trip.expenses.find((e: any) => e.id === expenseId);
-      if (!expense) return;
-      const splitsArray = expense.split_members || expense.splits || [];
-      if (!Array.isArray(splitsArray)) return;
-
-      const updatedSplits = splitsArray.map((s: any) => {
-        const sId = String(s?.participantId || s?.id || s).trim();
-        if (sId === participantId) {
-          return {
-            ...(typeof s === 'object' ? s : { participantId: sId }),
-            isSettled: !currentStatus,
-          };
-        }
-        return s;
-      });
+      const newStatus = !currentStatus;
 
       // Update in Supabase for persistence
       const supabase = createClient();
       const { error } = await supabase
         .from('expenses')
-        .update({ split_members: updatedSplits, splits: updatedSplits })
+        .update({ is_settled: newStatus })
         .eq('id', expenseId);
 
       if (error) throw error;
 
       // Optimistic UI state update via centralized updateTrip
       const updatedExpenses = trip.expenses.map((e: any) => 
-        e.id === expenseId ? { ...e, split_members: updatedSplits, splits: updatedSplits } : e
+        e.id === expenseId ? { ...e, is_settled: newStatus, isSettled: newStatus } : e
       );
       updateTrip(trip.id, { expenses: updatedExpenses });
     } catch (err) {
-      console.error("Error toggling settle status:", err);
+      console.error("Error toggling expense settle status:", err);
     }
   };
 
@@ -356,7 +342,7 @@ export default function TripDetailPage({ params }: { params: Promise<{ tripId: s
             isGroupTrip={isGroupTrip}
           />
         ) : activeTab === "settlement" ? (
-          <SettlementTab trip={trip} onToggleSettle={handleToggleSettle} />
+          <SettlementTab trip={trip} onToggleExpenseSettle={handleToggleExpenseSettle} />
         ) : null}
       </div>
 

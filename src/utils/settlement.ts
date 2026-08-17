@@ -54,6 +54,8 @@ export const calculateSettlement = (
   });
 
   for (const expense of validExpenses) {
+    if (expense.is_settled || expense.isSettled) continue;
+
     const creditorId = String(expense.paid_by || expense.paidById || expense.payer_id || '').trim();
     if (!debtMatrix[creditorId]) continue; // Safety check in case payer is not in members array
 
