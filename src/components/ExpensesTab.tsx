@@ -10,10 +10,8 @@ import { convertToBase, formatBase, getExchangeRate, getConvertedAmountTHB } fro
 import ExpensePieChart from "./ExpensePieChart";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { useCurrency } from "@/contexts/CurrencyContext";
-import { computeSettlementsInBase } from "@/lib/settlement";
 import ExpenseCard          from "@/components/ExpenseCard";
 import ExpenseDetailModal   from "@/components/ExpenseDetailModal";
-import SettlementV2         from "@/components/settlement/SettlementV2";
 import AddExpenseModal       from "@/components/AddExpenseModal";
 import IndividualSummary     from "@/components/IndividualSummary";
 import CurrencySettings      from "@/components/CurrencySettings";
@@ -33,7 +31,7 @@ interface ExpensesTabProps {
 type SortKey   = "date-asc" | "date-desc" | "amount-high" | "amount-low";
 type FilterCat = ExpenseCategory | "all";
 type FilterCur = Currency | "all";
-type Section   = "ledger" | "individual" | "settlement";
+type Section   = "ledger" | "individual";
 type ModalState = null | { mode: "add" } | { mode: "edit"; expense: Expense } | { mode: "detail"; expense: Expense };
 
 export default function ExpensesTab({
@@ -55,17 +53,6 @@ export default function ExpensesTab({
   const toggleDate = (date: string) => {
     setExpandedDates(prev => ({ ...prev, [date]: !prev[date] }));
   };
-
-  // Fallback if settlement tab vanishes while active
-  if (activeSection === "settlement" && !isGroupTrip) {
-    setActiveSection("ledger");
-  }
-
-  // Settlements computed in base currency — participants passed for fallback split logic
-  const settlements = useMemo(
-    () => computeSettlementsInBase(expenses, rates, baseCurrency, participants),
-    [expenses, rates, baseCurrency, participants]
-  );
 
   // Per-currency raw totals and their frozen base equivalents
   const rawTotals = expenses.reduce<Record<string, { total: number; baseTotal: number }>>((acc, e) => {
@@ -141,9 +128,6 @@ export default function ExpensesTab({
     { key: "ledger",     label: "📋 Ledger"    },
     { key: "individual", label: "👤 Individual" },
   ];
-  if (isGroupTrip) {
-    sections.push({ key: "settlement", label: "🧮 Settlement" });
-  }
 
   return (
     <div>
@@ -322,25 +306,6 @@ export default function ExpensesTab({
             participants={participants} 
             customCategories={customCategories} 
             onViewExpense={(e) => setModalState({ mode: "detail", expense: e })} 
-          />
-        </div>
-      )}
-
-      {/* ── SETTLEMENT ─────────────────────────────────────────────────────── */}
-      {activeSection === "settlement" && (
-        <div>
-          <h3 className="mb-1 font-pixel text-[10px] uppercase text-stone-800 dark:text-[#fdfbf7]">Who Owes Whom</h3>
-          <p className="mb-1 font-mono text-xs text-stone-600 dark:text-stone-400">
-            All debts simplified and expressed in {baseMeta.flag} {baseCurrency}. Updates instantly on every change.
-          </p>
-          <p className="mb-4 font-mono text-[9px] text-stone-500 dark:text-stone-400">
-            Using your exchange rates: 1 CNY = {rates.CNY} {baseCurrency} · 1 JPY = {rates.JPY} {baseCurrency} · 1 USD = {rates.USD} {baseCurrency}
-          </p>
-          
-
-          <SettlementV2
-            members={participants}
-            expenses={expenses}
           />
         </div>
       )}

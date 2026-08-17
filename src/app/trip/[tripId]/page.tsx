@@ -510,8 +510,8 @@ export default function TripDetailPage({ params }: { params: Promise<{ tripId: s
                 const rate = Number(e.custom_exchange_rate) > 0 
                   ? Number(e.custom_exchange_rate) 
                   : (Number(e.exchange_rate) > 0 && Number(e.exchange_rate) !== 1 ? Number(e.exchange_rate) : 0.209096);
-                const raw = Number(e.foreign_amount) > 0 ? Number(e.foreign_amount) : (Number(e.amount) || 0);
-                return raw * rate;
+                const foreign = Number(e.foreign_amount) > 0 ? Number(e.foreign_amount) : (Number(e.amount) || 0);
+                return foreign * rate;
               };
 
               // Balance Computation
