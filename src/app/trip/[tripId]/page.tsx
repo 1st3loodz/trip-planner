@@ -230,20 +230,12 @@ export default function TripDetailPage({ params }: { params: Promise<{ tripId: s
     try {
       const newStatus = !currentStatus;
 
-      // Update in Supabase for persistence
-      const supabase = createClient();
-      const { error } = await supabase
-        .from('expenses')
-        .update({ is_settled: newStatus })
-        .eq('id', expenseId);
-
-      if (error) throw error;
-
-      // Optimistic UI state update via centralized updateTrip
       const updatedExpenses = trip.expenses.map((e: any) => 
         e.id === expenseId ? { ...e, is_settled: newStatus, isSettled: newStatus } : e
       );
-      updateTrip(trip.id, { expenses: updatedExpenses });
+      
+      // Update the trips table directly via the centralized updateTrip method
+      await updateTrip(trip.id, { expenses: updatedExpenses });
     } catch (err) {
       console.error("Error toggling expense settle status:", err);
     }

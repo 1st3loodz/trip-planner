@@ -1,4 +1,5 @@
 {
+  "name": "trip-planner",
   "framework": "nextjs",
   "buildCommand": "npm run build",
   "outputDirectory": ".next"
