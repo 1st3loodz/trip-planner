@@ -396,16 +396,11 @@ export default function TripDetailPage({ params }: { params: Promise<{ tripId: s
   };
 
   const isSharedExpense = (e: any): boolean => {
-    const splits = e.split_members || e.splits || [];
-    if (!e || !Array.isArray(splits) || splits.length === 0) return false;
-    const payerId = String(e.paid_by || e.paidById || e.payer_id || '').trim();
-    
-    // If split among multiple people -> Definitely shared
-    if (splits.length > 1) return true;
-
-    // If split with 1 person, but that person is NOT the payer -> It's a debt/shared
-    const singleParticipantId = String(splits[0]?.participantId || splits[0]?.id || splits[0] || '').trim();
-    return singleParticipantId !== payerId;
+    if (!e || !Array.isArray(e.split_members) || e.split_members.length === 0) return false;
+    const payerId = String(e.paid_by || '').trim();
+    if (e.split_members.length > 1) return true;
+    const singleId = String(e.split_members[0]?.participantId || e.split_members[0]?.id || e.split_members[0] || '').trim();
+    return singleId !== payerId;
   };
 
   if (!isLoaded) {
@@ -525,42 +520,25 @@ export default function TripDetailPage({ params }: { params: Promise<{ tripId: s
               };
 
               // Balance Computation
-              const balances = (members || []).map((member) => {
-                const mId = String(member.id).trim();
+              const balances = (members || []).map((m) => {
+                const mId = String(m.id).trim();
 
-                // Paid
+                // A. Only sum shared expenses paid by this member
                 const totalPaid = (expenses || [])
-                  .filter((e: any) => String(e.paid_by || e.paidById || e.payer_id || '').trim() === mId)
-                  .reduce((sum, e: any) => {
-                    const baseAmt = toTHB(e);
-                    const splits = Array.isArray(e.split_members) ? e.split_members : (Array.isArray(e.splits) ? e.splits : []);
-                    let settledTotal = 0;
-                    splits.forEach((s: any) => {
-                      if (s.isSettled && String(s?.participantId || s?.id || s).trim() !== mId) {
-                        if (typeof s === 'object' && s.amount !== undefined) {
-                          const rate = (e.currency !== 'THB' && e.currency) 
-                            ? (Number(e.custom_exchange_rate) || Number(e.exchange_rate) || 0.209096) 
-                            : 1;
-                          settledTotal += Number(s.amount) * rate;
-                        } else {
-                          settledTotal += baseAmt / (splits.length || 1);
-                        }
-                      }
-                    });
-                    return sum + (baseAmt - settledTotal);
-                  }, 0);
+                  .filter((e: any) => isSharedExpense(e) && String(e.paid_by || '').trim() === mId)
+                  .reduce((sum, e: any) => sum + toTHB(e), 0);
 
-                // Share
-                const totalShare = (expenses || []).reduce((sum, e: any) => {
-                  const splits = Array.isArray(e.split_members) ? e.split_members : (Array.isArray(e.splits) ? e.splits : []);
+                // B. Only sum shared expenses consumed by this member
+                const totalShare = (expenses || []).filter(isSharedExpense).reduce((sum, e: any) => {
+                  const splits = Array.isArray(e.split_members) ? e.split_members : [];
                   const mySplit = splits.find((s: any) => String(s?.participantId || s?.id || s).trim() === mId);
-                  
-                  if (!mySplit || mySplit.isSettled) return sum;
+                  if (!mySplit) return sum;
+
+                  const rate = (e.currency !== 'THB' && e.currency) 
+                    ? (Number(e.custom_exchange_rate) || Number(e.exchange_rate) || 0.209096) 
+                    : 1;
 
                   if (typeof mySplit === 'object' && mySplit.amount !== undefined) {
-                    const rate = (e.currency !== 'THB' && e.currency) 
-                      ? (Number(e.custom_exchange_rate) || Number(e.exchange_rate) || 0.209096) 
-                      : 1;
                     return sum + (Number(mySplit.amount) * rate);
                   }
                   return sum + (toTHB(e) / (splits.length || 1));
@@ -570,7 +548,7 @@ export default function TripDetailPage({ params }: { params: Promise<{ tripId: s
 
                 return {
                   id: mId,
-                  name: member.name,
+                  name: m.name,
                   paid: Math.round(totalPaid * 100) / 100,
                   share: Math.round(totalShare * 100) / 100,
                   net: net,
