@@ -8,6 +8,23 @@ interface SettlementTabProps {
   onToggleExpenseSettle: (expenseId: string, currentStatus: boolean) => void;
 }
 
+const getActualRate = (e: any): number => {
+  const customRate = Number(e.custom_exchange_rate || e.customExchangeRate);
+  if (customRate > 0) return customRate;
+
+  const dbRate = Number(e.exchange_rate || e.exchangeRate || e.rate);
+  if (dbRate > 0 && dbRate !== 1) return dbRate;
+
+  // If amount is converted, calculate effective rate: (THB Amount / Foreign Amount)
+  const foreign = Number(e.foreign_amount || e.foreignAmount || 0);
+  const thb = convertToTHB(e);
+  if (foreign > 0 && thb > 0) {
+    return thb / foreign;
+  }
+
+  return 0.209096; // Standard fallback if completely undefined
+};
+
 export default function SettlementTab({ trip, currentUserId, onToggleExpenseSettle }: SettlementTabProps) {
   const { transfers } = calculateSettlement(trip.expenses, trip.participants);
   
@@ -101,7 +118,7 @@ export default function SettlementTab({ trip, currentUserId, onToggleExpenseSett
                       </span>
                       <span className={`text-xs truncate ${isSettled ? 'text-gray-400 line-through' : 'text-gray-500 dark:text-gray-400'}`}>
                         จ่ายโดย {payer} • หาร {splitCount} คน • รวม ฿{thbAmt.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                        {isForeign && ` (${Number(expense.foreign_amount || expense.amount || 0).toLocaleString('en-US')} ${expense.currency} @ ${Number(expense.custom_exchange_rate || expense.exchange_rate || 1)})`}
+                        {isForeign && ` (${Number(expense.foreign_amount || expense.amount || 0).toLocaleString('en-US')} ${expense.currency} @ ${Number(getActualRate(expense).toFixed(4))})`}
                       </span>
                     </div>
                     <div className="flex flex-col items-end">
