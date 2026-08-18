@@ -22,7 +22,7 @@ export const getExpenseExchangeRate = (
   if (customRate > 0) return customRate;
 
   // 2. Explicit stored rate on the expense (ignore 1 for foreign currencies)
-  const storedRate = Number(expense.exchange_rate || expense.exchangeRate || expense.rate);
+  const storedRate = Number(expense.exchange_rate || expense.exchangeRate || expense.rate || expense.historicalRate);
   if (storedRate > 0 && storedRate !== 1) return storedRate;
 
   // 3. Trip-level or Currency Context exchange rate for this currency
