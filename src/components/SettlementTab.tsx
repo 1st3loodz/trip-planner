@@ -100,7 +100,7 @@ export default function SettlementTab({ trip, currentUserId, onToggleExpenseSett
                       </span>
                       <span className={`text-xs truncate ${isSettled ? 'text-gray-400 line-through' : 'text-gray-500 dark:text-gray-400'}`}>
                         จ่ายโดย {payer} • หาร {splitCount} คน • รวม ฿{thbAmt.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                        {isForeign && ` (${Number(expense.foreign_amount || expense.amount || 0).toLocaleString('en-US')} ${expense.currency} @ ${Number(getExpenseExchangeRate(expense, tripRates).toFixed(4))})`}
+                        {isForeign && ` (${Number(expense.foreign_amount || expense.amount || 0).toLocaleString('en-US')} ${expense.currency} @ ${Number(getExpenseExchangeRate(expense, tripRates).toFixed(6)).toString()})`}
                       </span>
                     </div>
                     <div className="flex flex-col items-end">
