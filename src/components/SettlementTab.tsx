@@ -95,12 +95,13 @@ export default function SettlementTab({ trip, currentUserId, onToggleExpenseSett
                       {isSettled && <span className="text-[10px] font-bold">✓</span>}
                     </button>
 
-                    <div className="flex flex-col flex-1">
+                    <div className="flex flex-col flex-1 min-w-0">
                       <span className={`font-semibold text-sm ${isSettled ? 'text-gray-400 line-through' : 'text-gray-800'}`}>
                         {expense.title || expense.description || 'Expense'}
                       </span>
-                      <span className="text-xs text-gray-500">
-                        จ่ายโดย {payer} • หาร {splitCount} คน
+                      <span className={`text-xs truncate ${isSettled ? 'text-gray-400 line-through' : 'text-gray-500 dark:text-gray-400'}`}>
+                        จ่ายโดย {payer} • หาร {splitCount} คน • รวม ฿{thbAmt.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                        {isForeign && ` (${Number(expense.foreign_amount || expense.amount || 0).toLocaleString('en-US')} ${expense.currency} @ ${Number(expense.custom_exchange_rate || expense.exchange_rate || 1)})`}
                       </span>
                     </div>
                     <div className="flex flex-col items-end">
@@ -115,12 +116,6 @@ export default function SettlementTab({ trip, currentUserId, onToggleExpenseSett
                       ) : (
                         <span className={`font-medium ${isSettled ? 'text-gray-400 line-through' : 'text-gray-400'}`}>
                           ฿0.00
-                        </span>
-                      )}
-                      
-                      {isForeign && (
-                        <span className={`text-[10px] ${isSettled ? 'text-gray-300' : 'text-gray-400'}`}>
-                          {Number(expense.foreign_amount || expense.foreignAmount || expense.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })} {expense.currency}
                         </span>
                       )}
                     </div>
