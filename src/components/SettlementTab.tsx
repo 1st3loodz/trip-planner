@@ -9,7 +9,8 @@ interface SettlementTabProps {
 }
 
 export default function SettlementTab({ trip, currentUserId, onToggleExpenseSettle }: SettlementTabProps) {
-  const { transfers } = calculateSettlement(trip.expenses, trip.participants);
+  const tripRates = (trip as any).exchangeRates || null;
+  const { transfers } = calculateSettlement(trip.expenses, trip.participants, tripRates);
   
   const validExpenses = trip.expenses.filter(isSharedExpense);
 
@@ -46,7 +47,7 @@ export default function SettlementTab({ trip, currentUserId, onToggleExpenseSett
             {validExpenses.map((expense: any) => {
               const payerId = String(expense.paid_by || expense.paidById || expense.payer_id || '').trim();
               const payer = trip.participants.find(m => String(m.id).trim() === payerId)?.name || 'Unknown';
-              const thbAmt = convertToTHB(expense);
+              const thbAmt = convertToTHB(expense, tripRates);
               const isForeign = expense.currency && expense.currency !== 'THB';
               const splits = expense.split_members || expense.splits || [];
               const splitCount = Array.isArray(splits) ? splits.length : 1;
@@ -61,7 +62,7 @@ export default function SettlementTab({ trip, currentUserId, onToggleExpenseSett
                 
                 if (mySplit) {
                   if (typeof mySplit === 'object' && mySplit.amount !== undefined) {
-                    const rate = getExpenseExchangeRate(expense);
+                    const rate = getExpenseExchangeRate(expense, tripRates);
                     myShareInTHB = Number(mySplit.amount) * rate;
                   } else {
                     myShareInTHB = thbAmt / (splits.length || 1);
@@ -99,7 +100,7 @@ export default function SettlementTab({ trip, currentUserId, onToggleExpenseSett
                       </span>
                       <span className={`text-xs truncate ${isSettled ? 'text-gray-400 line-through' : 'text-gray-500 dark:text-gray-400'}`}>
                         จ่ายโดย {payer} • หาร {splitCount} คน • รวม ฿{thbAmt.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                        {isForeign && ` (${Number(expense.foreign_amount || expense.amount || 0).toLocaleString('en-US')} ${expense.currency} @ ${Number(getExpenseExchangeRate(expense).toFixed(4))})`}
+                        {isForeign && ` (${Number(expense.foreign_amount || expense.amount || 0).toLocaleString('en-US')} ${expense.currency} @ ${Number(getExpenseExchangeRate(expense, tripRates).toFixed(4))})`}
                       </span>
                     </div>
                     <div className="flex flex-col items-end">

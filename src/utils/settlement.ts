@@ -10,40 +10,52 @@ export interface SettlementResult {
   transfers: SettlementTransfer[];
 }
 
-export const getExpenseExchangeRate = (expense: any): number => {
-  if (!expense || expense.currency === 'THB' || !expense.currency) {
-    return 1;
-  }
+export const getExpenseExchangeRate = (
+  expense: any, 
+  tripRates?: Record<string, number> | null
+): number => {
+  const currency = String(expense.currency || 'THB').toUpperCase();
+  if (currency === 'THB') return 1;
 
-  // Priority 1: Explicit custom rate set by user for this bill
+  // 1. Explicit custom rate saved on this specific expense
   const customRate = Number(expense.custom_exchange_rate || expense.customExchangeRate);
   if (customRate > 0) return customRate;
 
-  // Priority 2: Stored exchange rate on the transaction
+  // 2. Explicit stored rate on the expense (ignore 1 for foreign currencies)
   const storedRate = Number(expense.exchange_rate || expense.exchangeRate || expense.rate);
   if (storedRate > 0 && storedRate !== 1) return storedRate;
 
-  // Priority 3: Derive actual rate from amounts: THB / Foreign
+  // 3. Trip-level or Currency Context exchange rate for this currency
+  if (tripRates && Number(tripRates[currency]) > 0 && Number(tripRates[currency]) !== 1) {
+    return Number(tripRates[currency]);
+  }
+
+  // 4. Inferred rate from amounts if foreign_amount and amount both exist and differ
   const foreignAmt = Number(expense.foreign_amount || expense.foreignAmount || 0);
   const thbAmt = Number(expense.amount || 0);
-  if (foreignAmt > 0 && thbAmt > 0) {
+  if (foreignAmt > 0 && thbAmt > 0 && foreignAmt !== thbAmt) {
     return thbAmt / foreignAmt;
   }
 
-  // Default fallback if no foreign conversion data exists
+  // 5. Default currency-specific fallback to prevent 1:1 disaster
+  if (currency === 'JPY') return 0.209096;
+  if (currency === 'USD') return 35.5;
+  if (currency === 'KRW') return 0.026;
+  if (currency === 'EUR') return 38.5;
+
   return 1;
 };
 
-export const convertToTHB = (expense: Expense | any): number => {
+export const convertToTHB = (
+  expense: any, 
+  tripRates?: Record<string, number> | null
+): number => {
   if (!expense) return 0;
-  if (expense.currency === 'THB' || !expense.currency) {
-    return Number(expense.amount) || 0;
-  }
+  const currency = String(expense.currency || 'THB').toUpperCase();
+  if (currency === 'THB') return Number(expense.amount) || 0;
 
-  const rate = getExpenseExchangeRate(expense);
+  const rate = getExpenseExchangeRate(expense, tripRates);
   const foreignAmt = Number(expense.foreign_amount || expense.foreignAmount || expense.amount || 0);
-  
-  // If the stored amount is already in THB, return it directly; otherwise multiply by rate
   return foreignAmt * rate;
 };
 
@@ -66,7 +78,8 @@ export const isSharedExpense = (e: Expense | any): boolean => {
 
 export const calculateSettlement = (
   expenses: (Expense | any)[],
-  members: Participant[]
+  members: Participant[],
+  tripRates?: Record<string, number> | null
 ): SettlementResult => {
   const validExpenses = (expenses || []).filter(isSharedExpense);
 
@@ -95,12 +108,12 @@ export const calculateSettlement = (
 
       if (debtorId !== creditorId) {
         let debtorShare = 0;
-        const rate = getExpenseExchangeRate(expense);
+        const rate = getExpenseExchangeRate(expense, tripRates);
 
         if (typeof split === 'object' && split.amount !== undefined) {
           debtorShare = Number(split.amount) * rate;
         } else {
-          debtorShare = convertToTHB(expense) / splits.length;
+          debtorShare = convertToTHB(expense, tripRates) / splits.length;
         }
 
         debtMatrix[debtorId][creditorId] += debtorShare;
