@@ -10,14 +10,41 @@ export interface SettlementResult {
   transfers: SettlementTransfer[];
 }
 
-export const convertToTHB = (e: Expense | any): number => {
-  if (!e) return 0;
-  if (e.currency === 'THB' || !e.currency) return Number(e.amount) || 0;
-  const rate = Number(e.custom_exchange_rate) > 0 
-    ? Number(e.custom_exchange_rate) 
-    : (Number(e.exchange_rate) > 0 && Number(e.exchange_rate) !== 1 ? Number(e.exchange_rate) : 0.209096);
-  const foreign = Number(e.foreign_amount) > 0 ? Number(e.foreign_amount) : (Number(e.amount) || 0);
-  return foreign * rate;
+export const getExpenseExchangeRate = (expense: any): number => {
+  if (!expense || expense.currency === 'THB' || !expense.currency) {
+    return 1;
+  }
+
+  // Priority 1: Explicit custom rate set by user for this bill
+  const customRate = Number(expense.custom_exchange_rate || expense.customExchangeRate);
+  if (customRate > 0) return customRate;
+
+  // Priority 2: Stored exchange rate on the transaction
+  const storedRate = Number(expense.exchange_rate || expense.exchangeRate || expense.rate);
+  if (storedRate > 0 && storedRate !== 1) return storedRate;
+
+  // Priority 3: Derive actual rate from amounts: THB / Foreign
+  const foreignAmt = Number(expense.foreign_amount || expense.foreignAmount || 0);
+  const thbAmt = Number(expense.amount || 0);
+  if (foreignAmt > 0 && thbAmt > 0) {
+    return thbAmt / foreignAmt;
+  }
+
+  // Default fallback if no foreign conversion data exists
+  return 1;
+};
+
+export const convertToTHB = (expense: Expense | any): number => {
+  if (!expense) return 0;
+  if (expense.currency === 'THB' || !expense.currency) {
+    return Number(expense.amount) || 0;
+  }
+
+  const rate = getExpenseExchangeRate(expense);
+  const foreignAmt = Number(expense.foreign_amount || expense.foreignAmount || expense.amount || 0);
+  
+  // If the stored amount is already in THB, return it directly; otherwise multiply by rate
+  return foreignAmt * rate;
 };
 
 export const isSharedExpense = (e: Expense | any): boolean => {
@@ -68,9 +95,7 @@ export const calculateSettlement = (
 
       if (debtorId !== creditorId) {
         let debtorShare = 0;
-        const rate = (expense.currency !== 'THB' && expense.currency) 
-          ? (Number(expense.custom_exchange_rate) || Number(expense.exchange_rate) || 0.209096) 
-          : 1;
+        const rate = getExpenseExchangeRate(expense);
 
         if (typeof split === 'object' && split.amount !== undefined) {
           debtorShare = Number(split.amount) * rate;
