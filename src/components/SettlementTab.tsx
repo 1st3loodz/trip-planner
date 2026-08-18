@@ -9,10 +9,10 @@ interface SettlementTabProps {
 }
 
 export default function SettlementTab({ trip, currentUserId, onToggleExpenseSettle }: SettlementTabProps) {
-  const [collapsedDates, setCollapsedDates] = useState<Record<string, boolean>>({});
+  const [expandedDates, setExpandedDates] = useState<Record<string, boolean>>({});
 
   const toggleDateGroup = (dateKey: string) => {
-    setCollapsedDates(prev => ({ ...prev, [dateKey]: !prev[dateKey] }));
+    setExpandedDates(prev => ({ ...prev, [dateKey]: !prev[dateKey] }));
   };
 
   const tripRates = (trip as any).exchangeRates || null;
@@ -71,7 +71,7 @@ export default function SettlementTab({ trip, currentUserId, onToggleExpenseSett
           <h4 className="font-semibold text-gray-800 text-sm mb-3">📋 รายการค่าใช้จ่ายทั้งหมด ({validExpenses.length} รายการ)</h4>
           <div className="space-y-4">
             {Object.entries(groupedExpenses).map(([dateKey, groupExpenses]) => {
-              const isCollapsed = collapsedDates[dateKey];
+              const isExpanded = Boolean(expandedDates[dateKey]);
               let dailyNetImpact = 0;
               let dailyTotalTHB = 0;
 
@@ -139,11 +139,11 @@ export default function SettlementTab({ trip, currentUserId, onToggleExpenseSett
                           รวม ฿{dailyTotalTHB.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                         </span>
                       )}
-                      <span className="text-gray-400 text-xs">{isCollapsed ? '▼' : '▲'}</span>
+                      <span className="text-gray-400 text-xs">{isExpanded ? '▲' : '▼'}</span>
                     </div>
                   </div>
 
-                  {!isCollapsed && (
+                  {isExpanded && (
                     <div className="p-3 bg-white space-y-2 border-t border-gray-100">
                       {enhancedGroup.map((expense: any) => (
                         <div key={expense.id} className={`bg-gray-50 rounded-xl border border-gray-100 overflow-hidden transition-colors ${expense.isSettled ? 'opacity-50' : 'hover:bg-gray-100'}`}>
