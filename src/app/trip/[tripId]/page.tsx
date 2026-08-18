@@ -21,7 +21,7 @@ export default function TripDetailPage({ params }: { params: Promise<{ tripId: s
   // React `use` hook to unwrap params
   const { tripId } = use(params);
 
-  const { isLoaded, getTrip, updateTrip, addTripMember, removeTripMember, refreshTrips } = useTrips();
+  const { isLoaded, getTrip, updateTrip, addTripMember, removeTripMember, refreshTrips, userId } = useTrips();
   const { setBaseCurrency } = useCurrency();
   const contextTrip = getTrip(tripId);
 
@@ -334,7 +334,7 @@ export default function TripDetailPage({ params }: { params: Promise<{ tripId: s
             isGroupTrip={isGroupTrip}
           />
         ) : activeTab === "settlement" ? (
-          <SettlementTab trip={trip} onToggleExpenseSettle={handleToggleExpenseSettle} />
+          <SettlementTab trip={trip} currentUserId={userId} onToggleExpenseSettle={handleToggleExpenseSettle} />
         ) : null}
       </div>
 

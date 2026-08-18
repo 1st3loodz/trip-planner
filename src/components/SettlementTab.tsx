@@ -4,10 +4,11 @@ import { calculateSettlement, convertToTHB, isSharedExpense } from "@/utils/sett
 
 interface SettlementTabProps {
   trip: Trip;
+  currentUserId?: string | null;
   onToggleExpenseSettle: (expenseId: string, currentStatus: boolean) => void;
 }
 
-export default function SettlementTab({ trip, onToggleExpenseSettle }: SettlementTabProps) {
+export default function SettlementTab({ trip, currentUserId, onToggleExpenseSettle }: SettlementTabProps) {
   const { transfers } = calculateSettlement(trip.expenses, trip.participants);
   
   const validExpenses = trip.expenses.filter(isSharedExpense);
@@ -43,12 +44,39 @@ export default function SettlementTab({ trip, onToggleExpenseSettle }: Settlemen
           <h4 className="font-semibold text-gray-800 text-sm mb-3">📋 รายการค่าใช้จ่ายทั้งหมด ({validExpenses.length} รายการ)</h4>
           <div className="space-y-2">
             {validExpenses.map((expense: any) => {
-              const payer = trip.participants.find(m => String(m.id).trim() === String(expense.paid_by || expense.paidById || expense.payer_id || '').trim())?.name || 'Unknown';
+              const payerId = String(expense.paid_by || expense.paidById || expense.payer_id || '').trim();
+              const payer = trip.participants.find(m => String(m.id).trim() === payerId)?.name || 'Unknown';
               const thbAmt = convertToTHB(expense);
               const isForeign = expense.currency && expense.currency !== 'THB';
               const splits = expense.split_members || expense.splits || [];
               const splitCount = Array.isArray(splits) ? splits.length : 1;
               const isSettled = expense.is_settled || expense.isSettled || false;
+
+              let myShareInTHB = 0;
+              let netImpact = 0;
+
+              if (currentUserId) {
+                const currentId = String(currentUserId).trim();
+                const mySplit = splits.find((s: any) => String(s?.participantId || s?.id || s).trim() === currentId);
+                
+                if (mySplit) {
+                  if (typeof mySplit === 'object' && mySplit.amount !== undefined) {
+                    const rate = (expense.currency !== 'THB' && expense.currency) 
+                      ? (Number(expense.custom_exchange_rate) || Number(expense.exchange_rate) || 0.209096) 
+                      : 1;
+                    myShareInTHB = Number(mySplit.amount) * rate;
+                  } else {
+                    myShareInTHB = thbAmt / (splits.length || 1);
+                  }
+                }
+
+                const isPayer = payerId === currentId;
+                if (isPayer) {
+                  netImpact = +(thbAmt - myShareInTHB);
+                } else {
+                  netImpact = -(myShareInTHB);
+                }
+              }
 
               return (
                 <div key={expense.id} className={`bg-gray-50 rounded-xl border border-gray-100 overflow-hidden transition-colors ${isSettled ? 'opacity-50' : 'hover:bg-gray-100'}`}>
@@ -76,9 +104,20 @@ export default function SettlementTab({ trip, onToggleExpenseSettle }: Settlemen
                       </span>
                     </div>
                     <div className="flex flex-col items-end">
-                      <span className={`font-bold ${isSettled ? 'text-gray-400 line-through' : 'text-gray-900'}`}>
-                        ฿{thbAmt.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                      </span>
+                      {netImpact > 0.01 ? (
+                        <span className={`font-bold ${isSettled ? 'text-gray-400 line-through' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                          +฿{netImpact.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                        </span>
+                      ) : netImpact < -0.01 ? (
+                        <span className={`font-bold ${isSettled ? 'text-gray-400 line-through' : 'text-rose-600 dark:text-rose-400'}`}>
+                          -฿{Math.abs(netImpact).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                        </span>
+                      ) : (
+                        <span className={`font-medium ${isSettled ? 'text-gray-400 line-through' : 'text-gray-400'}`}>
+                          ฿0.00
+                        </span>
+                      )}
+                      
                       {isForeign && (
                         <span className={`text-[10px] ${isSettled ? 'text-gray-300' : 'text-gray-400'}`}>
                           {Number(expense.foreign_amount || expense.foreignAmount || expense.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })} {expense.currency}
