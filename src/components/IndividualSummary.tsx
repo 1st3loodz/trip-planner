@@ -40,7 +40,7 @@ export default function IndividualSummary({ expenses, participants, customCatego
     const map = new Map<string, LedgerEntry[]>();
     for (const exp of expenses) {
       const effectiveRate = getExchangeRate(exp);
-      const isLegacy = exp.foreignAmount === undefined && exp.currency !== baseCurrency;
+      const isLegacy = exp.foreignAmount === undefined && (exp as any).foreign_amount === undefined && exp.currency !== baseCurrency;
       
       const totalBillTHB = getConvertedAmountTHB(exp);
         
@@ -304,7 +304,7 @@ export default function IndividualSummary({ expenses, participants, customCatego
                           </p>
                           <p className="font-mono text-[9px] text-stone-500 mt-0.5 tabular-nums">
                             {expense.currency !== baseCurrency && (
-                              <span className="mr-1">{cur?.flag} {formatCurrency(expense.foreignAmount ?? expense.amount, expense.currency)} (Rate: {effectiveRate}) ➔ </span>
+                              <span className="mr-1">{cur?.flag} {formatCurrency((expense as any).foreign_amount ?? expense.foreignAmount ?? expense.amount, expense.currency)} (Rate: {effectiveRate}) ➔ </span>
                             )}
                             Total: {formatBase(totalBillTHB, baseCurrency)} | Your share: {formatBase(shareBase, baseCurrency)}
                           </p>
