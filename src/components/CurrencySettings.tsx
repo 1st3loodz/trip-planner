@@ -9,6 +9,23 @@ const ALL_CURRENCIES = Object.keys(CURRENCY_META) as Currency[];
 export default function CurrencySettings() {
   const { baseCurrency, rates, setBaseCurrency, setRate } = useCurrency();
   const [open, setOpen] = useState(false);
+  const [localRates, setLocalRates] = useState<Record<string, string>>({});
+
+  const handleRateChange = (currency: string, newRateStr: string) => {
+    setLocalRates((prev) => ({ ...prev, [currency]: newRateStr }));
+  };
+
+  const handleRateBlur = (currency: string, newRateStr: string) => {
+    const parsed = parseFloat(newRateStr);
+    if (!isNaN(parsed) && parsed > 0) {
+      setRate(currency as Currency, parsed);
+    }
+  };
+
+  const handleBaseChange = (c: Currency) => {
+    setBaseCurrency(c);
+    setLocalRates({});
+  };
 
   const otherCurrencies = ALL_CURRENCIES.filter((c) => c !== baseCurrency);
   const baseMeta = CURRENCY_META[baseCurrency];
@@ -48,7 +65,7 @@ export default function CurrencySettings() {
                 return (
                   <button
                     key={c}
-                    onClick={() => setBaseCurrency(c)}
+                    onClick={() => handleBaseChange(c)}
                     className={`flex items-center gap-1.5 border-2 px-4 py-2 font-mono text-xs font-bold transition-all ${
                       active
                         ? "border-stone-800 bg-[#4a7c59] text-[#fdfbf7] shadow-[2px_2px_0_#292524] dark:border-[#2d5a3d] dark:shadow-[2px_2px_0_#1e1815]"
@@ -85,11 +102,9 @@ export default function CurrencySettings() {
                       type="number"
                       min="0"
                       step="any"
-                      value={rates[c]}
-                      onChange={(e) => {
-                        const v = parseFloat(e.target.value);
-                        if (!isNaN(v) && v > 0) setRate(c, v);
-                      }}
+                      value={localRates[c] !== undefined ? localRates[c] : (rates[c] ?? '')}
+                      onChange={(e) => handleRateChange(c, e.target.value)}
+                      onBlur={(e) => handleRateBlur(c, e.target.value)}
                       className="w-20 border-2 border-stone-400 bg-[#fdfbf7] px-2 py-1 font-mono text-xs font-bold text-stone-900 outline-none focus:border-stone-800 dark:border-[#54463d] dark:bg-[#1e1815] dark:text-[#fdfbf7] dark:focus:border-stone-400"
                     />
 
