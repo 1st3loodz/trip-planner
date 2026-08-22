@@ -134,37 +134,6 @@ export default function ExpensesTab({
       {/* ── Currency Settings (collapsible) ────────────────────────────────── */}
       <CurrencySettings />
 
-      {/* ── Grand total in base currency ───────────────────────────────────── */}
-      <div className="mb-4 flex items-center justify-between border-2 border-stone-800 bg-[#f5eed7] px-5 py-3 dark:border-[#54463d] dark:bg-[#362d28] shadow-[4px_4px_0_#292524] dark:shadow-[4px_4px_0_#1e1815]">
-        <div className="flex items-center gap-2">
-          <span className="text-base">{baseMeta.flag}</span>
-          <span className="font-pixel text-[8px] uppercase tracking-wider text-stone-700 dark:text-[#f5ebd5]">
-            Total trip cost in {baseCurrency}
-          </span>
-        </div>
-        <span className="font-mono text-lg font-black tabular-nums text-stone-800 dark:text-[#fdfbf7]">
-          {formatBase(grandTotalBase, baseCurrency)}
-        </span>
-      </div>
-
-      {/* ── Per-currency raw summary strip ─────────────────────────────────── */}
-      <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {Object.entries(rawTotals).map(([cur, { total, baseTotal }]) => {
-          const m        = CURRENCY_META[cur as Currency];
-          return (
-            <div key={cur} className="border-2 border-stone-400 bg-[#fdfbf7] p-4 dark:border-stone-600 dark:bg-[#28211d]">
-              <div className="mb-1 text-lg">{m.flag}</div>
-              <div className="font-mono text-base font-black tabular-nums text-stone-800 dark:text-[#fdfbf7]">
-                {formatCurrency(total, cur)}
-              </div>
-              <div className="font-pixel text-[8px] uppercase tracking-wider text-stone-500 dark:text-stone-400 mt-1">{cur} original</div>
-              <div className="mt-0.5 font-mono text-[10px] font-semibold text-stone-600 dark:text-stone-400 tabular-nums">
-                ≈ {formatBase(baseTotal, baseCurrency)}
-              </div>
-            </div>
-          );
-        })}
-      </div>
 
       {/* ── Section switcher ───────────────────────────────────────────────── */}
       <div className="mb-5 flex flex-wrap gap-2">
