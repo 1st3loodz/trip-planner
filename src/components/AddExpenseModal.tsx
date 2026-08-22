@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Participant, Currency, ExpenseCategory, Expense, CURRENCY_META, EXPENSE_CATEGORY_META } from "@/types/trip";
+import { Trip, Participant, Currency, ExpenseCategory, Expense, CURRENCY_META, EXPENSE_CATEGORY_META } from "@/types/trip";
 import { generateId } from "@/lib/utils";
 import { DEFAULT_RATES } from "@/lib/currency";
 import Avatar from "@/components/Avatar";
@@ -9,6 +9,7 @@ import { useCurrency } from "@/contexts/CurrencyContext";
 import { resolvePayerId } from "@/lib/settlement";
 
 interface AddExpenseModalProps {
+  trip?: Trip;
   participants: Participant[];
   initialExpense?: Expense;
   onSave: (expense: Expense) => void;
@@ -20,7 +21,7 @@ interface AddExpenseModalProps {
 const CURRENCIES = Object.keys(CURRENCY_META) as Currency[];
 const CATEGORIES = Object.keys(EXPENSE_CATEGORY_META) as ExpenseCategory[];
 
-export default function AddExpenseModal({ participants, initialExpense, onSave, onClose, customCategories, onAddCustomCategory }: AddExpenseModalProps) {
+export default function AddExpenseModal({ trip, participants, initialExpense, onSave, onClose, customCategories, onAddCustomCategory }: AddExpenseModalProps) {
   const isEdit = !!initialExpense;
   const [description, setDescription] = useState(initialExpense?.description ?? "");
   const [amount, setAmount] = useState(initialExpense?.foreignAmount?.toString() ?? initialExpense?.amount.toString() ?? "");
@@ -207,6 +208,8 @@ export default function AddExpenseModal({ participants, initialExpense, onSave, 
   const inputCls = (err?: string) =>
     `w-full border-2 bg-[#fdfbf7] px-3.5 py-2.5 font-mono text-sm text-stone-900 placeholder-stone-400 outline-none focus:border-stone-800 dark:bg-[#1e1815] dark:text-[#fdfbf7] dark:placeholder-stone-500 ${err ? "border-red-400 dark:border-red-500" : "border-stone-400 dark:border-stone-600"}`;
 
+  const applicableRates = trip?.exchange_records?.filter(r => r.currency === currency) || [];
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm dark:bg-black/70" />
@@ -278,6 +281,25 @@ export default function AddExpenseModal({ participants, initialExpense, onSave, 
                   <button type="button" onClick={() => setUseCustomRate(true)} className={`${useCustomRate ? "font-bold text-stone-900 dark:text-stone-200 underline" : "text-stone-500"}`}>Custom</button>
                 </div>
               </div>
+              
+              {applicableRates.length > 0 && (
+                <div className="mb-2">
+                  <select 
+                    onChange={(e) => {
+                      if (e.target.value) {
+                        setCustomRate(e.target.value);
+                        setUseCustomRate(true);
+                      }
+                    }}
+                    className="w-full font-mono text-xs p-2 border-2 border-stone-300 bg-white dark:bg-[#28211d] dark:border-stone-600 dark:text-white"
+                  >
+                    <option value="">-- Or select logged rate --</option>
+                    {applicableRates.map(r => (
+                      <option key={r.id} value={r.rate}>{r.label} ({r.rate} THB)</option>
+                    ))}
+                  </select>
+                </div>
+              )}
               
               <div className="flex items-center gap-2">
                 <input 

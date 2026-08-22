@@ -152,6 +152,14 @@ export interface CustomCategory {
   emoji: string;
 }
 
+export interface ExchangeRecord {
+  id: string;
+  currency: string;
+  rate: number;
+  label: string;
+  date: string;
+}
+
 export interface Trip {
   id: string;
   title: string;
@@ -166,6 +174,7 @@ export interface Trip {
   travelType?: "solo" | "group";
   baseCurrency?: Currency;
   notice?: string;
+  exchange_records?: ExchangeRecord[];
   /** UUID of the user who created this trip — used for ownership checks */
   createdBy?: string;
 }

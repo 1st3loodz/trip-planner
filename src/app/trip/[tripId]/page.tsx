@@ -323,6 +323,7 @@ export default function TripDetailPage({ params }: { params: Promise<{ tripId: s
           />
         ) : activeTab === "expenses" ? (
           <ExpensesTab
+            trip={trip}
             expenses={trip.expenses}
             participants={trip.participants}
             onAddExpense={handleAddExpense}

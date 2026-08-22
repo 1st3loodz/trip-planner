@@ -14,9 +14,11 @@ import ExpenseCard          from "@/components/ExpenseCard";
 import ExpenseDetailModal   from "@/components/ExpenseDetailModal";
 import AddExpenseModal       from "@/components/AddExpenseModal";
 import IndividualSummary     from "@/components/IndividualSummary";
-import CurrencySettings      from "@/components/CurrencySettings";
+import ExchangeRatesPool     from "@/components/ExchangeRatesPool";
+import { Trip } from "@/types/trip";
 
 interface ExpensesTabProps {
+  trip: Trip;
   expenses: Expense[];
   participants: Participant[];
   onAddExpense?: (e: Expense) => void;
@@ -35,7 +37,7 @@ type Section   = "ledger" | "individual";
 type ModalState = null | { mode: "add" } | { mode: "edit"; expense: Expense } | { mode: "detail"; expense: Expense };
 
 export default function ExpensesTab({
-  expenses, participants, onAddExpense,  onEditExpense,
+  trip, expenses, participants, onAddExpense,  onEditExpense,
   onEditExpenses,
   onDeleteExpense,
   customCategories, onAddCustomCategory, isGroupTrip
@@ -131,8 +133,8 @@ export default function ExpensesTab({
 
   return (
     <div>
-      {/* ── Currency Settings (collapsible) ────────────────────────────────── */}
-      <CurrencySettings />
+      {/* ── Exchange Rates Pool (collapsible) ────────────────────────────────── */}
+      <ExchangeRatesPool trip={trip} />
 
 
       {/* ── Section switcher ───────────────────────────────────────────────── */}
@@ -282,6 +284,7 @@ export default function ExpensesTab({
       {/* Modal */}
       {modalState?.mode === "add" || modalState?.mode === "edit" ? (
         <AddExpenseModal
+          trip={trip}
           participants={participants}
           initialExpense={modalState.mode === "edit" ? modalState.expense : undefined}
           onSave={handleSave}
