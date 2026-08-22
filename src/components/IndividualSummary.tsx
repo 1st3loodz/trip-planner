@@ -422,38 +422,6 @@ export default function IndividualSummary({ expenses, participants, customCatego
               </div>
             </div>
 
-            {/* ── Net Balance: เจ้าหนี้ / ลูกหนี้ badge ── */}
-            <div className="mt-4 border-t-2 border-stone-800 pt-3 dark:border-[#54463d] space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="font-pixel text-[8px] uppercase text-stone-600 dark:text-stone-400">Total Paid (จ่ายไป):</span>
-                <span className="font-mono text-xs font-semibold text-stone-700 dark:text-stone-300 tabular-nums">{formatBase(totalPaidBase, baseCurrency)}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="font-pixel text-[8px] uppercase text-stone-600 dark:text-stone-400">Total Share (ส่วนตัว):</span>
-                <span className="font-mono text-xs font-semibold text-stone-700 dark:text-stone-300 tabular-nums">{formatBase(sharedBase, baseCurrency)}</span>
-              </div>
-              <div className="flex items-center justify-between border-t border-stone-400 dark:border-stone-600 pt-2">
-                <div className="flex flex-col gap-0.5">
-                  <span className="font-pixel text-[10px] uppercase text-stone-800 dark:text-[#fdfbf7]">Net Balance:</span>
-                  <span className="font-pixel text-[8px] uppercase text-stone-500 dark:text-stone-400">ยอดสุทธิ</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className={`px-2 py-1 font-mono text-[10px] font-bold tracking-wider rounded ${
-                    netBalanceBase > 0.5
-                      ? "text-emerald-500 bg-emerald-50 dark:bg-emerald-900/30 dark:text-emerald-400"
-                      : netBalanceBase < -0.5
-                        ? "text-rose-500 bg-rose-50 dark:bg-rose-900/30 dark:text-rose-400"
-                        : "text-stone-500 bg-stone-100 dark:bg-stone-800 dark:text-stone-400"
-                  }`}>
-                    {netBalanceBase > 0.5 
-                      ? `ได้รับเงินคืน: +${formatBase(netBalanceBase, baseCurrency)}` 
-                      : netBalanceBase < -0.5 
-                        ? `ต้องจ่ายเงิน: -${formatBase(Math.abs(netBalanceBase), baseCurrency)}` 
-                        : `ยอดลงตัว: ${formatBase(0, baseCurrency)}`}
-                  </span>
-                </div>
-              </div>
-            </div>
           </div>
         </div>
       )}
