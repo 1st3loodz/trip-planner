@@ -13,6 +13,8 @@ export default function ExchangeRatesPool({ trip }: ExchangeRatesPoolProps) {
   const { updateTrip } = useTrips();
   const [open, setOpen] = useState(false);
   const [isAdding, setIsAdding] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   
   const [formCur, setFormCur] = useState<Currency>("JPY");
   const [formRate, setFormRate] = useState("");
@@ -20,32 +22,55 @@ export default function ExchangeRatesPool({ trip }: ExchangeRatesPoolProps) {
 
   const records = trip.exchange_records || [];
 
+  const resetForm = () => {
+    setIsAdding(false);
+    setEditingId(null);
+    setFormRate("");
+    setFormLabel("");
+    setDeleteConfirmId(null);
+  };
+
+  const handleEditClick = (record: ExchangeRecord) => {
+    setEditingId(record.id);
+    setFormCur(record.currency as Currency);
+    setFormRate(record.rate.toString());
+    setFormLabel(record.label);
+    setIsAdding(true);
+    setDeleteConfirmId(null);
+  };
+
   const handleSave = async () => {
     if (!formRate) return;
     const rateNum = parseFloat(formRate);
     if (isNaN(rateNum) || rateNum <= 0) return;
 
-    const newRecord: ExchangeRecord = {
-      id: generateId(),
-      currency: formCur,
-      rate: rateNum,
-      label: formLabel || "Exchange",
-      date: new Date().toISOString(),
-    };
-
-    await updateTrip(trip.id, {
-      exchange_records: [...records, newRecord]
-    });
-
-    setIsAdding(false);
-    setFormRate("");
-    setFormLabel("");
+    if (editingId) {
+      const updatedRecords = records.map(r => 
+        r.id === editingId 
+          ? { ...r, currency: formCur, rate: rateNum, label: formLabel || "Exchange" }
+          : r
+      );
+      await updateTrip(trip.id, { exchange_records: updatedRecords });
+    } else {
+      const newRecord: ExchangeRecord = {
+        id: generateId(),
+        currency: formCur,
+        rate: rateNum,
+        label: formLabel || "Exchange",
+        date: new Date().toISOString(),
+      };
+      await updateTrip(trip.id, {
+        exchange_records: [...records, newRecord]
+      });
+    }
+    resetForm();
   };
 
   const handleDelete = async (id: string) => {
     await updateTrip(trip.id, {
       exchange_records: records.filter(r => r.id !== id)
     });
+    setDeleteConfirmId(null);
   };
 
   return (
@@ -73,7 +98,10 @@ export default function ExchangeRatesPool({ trip }: ExchangeRatesPoolProps) {
           <div className="flex items-center justify-between mb-4">
             <h4 className="font-pixel text-[10px] uppercase text-stone-700 dark:text-stone-300">Logged Exchange Rates</h4>
             <button
-              onClick={() => setIsAdding(!isAdding)}
+              onClick={() => {
+                if (isAdding) resetForm();
+                else setIsAdding(true);
+              }}
               className="bg-[#4a7c59] text-white px-3 py-1.5 font-pixel text-[8px] uppercase tracking-wider hover:bg-[#3b6647] transition-colors"
             >
               {isAdding ? "Cancel" : "+ เพิ่มเรทแลกเงิน"}
@@ -133,9 +161,34 @@ export default function ExchangeRatesPool({ trip }: ExchangeRatesPoolProps) {
                     </span>
                     <span className="font-pixel text-[8px] text-stone-500 mt-1 uppercase tracking-widest">{record.label}</span>
                   </div>
-                  <button onClick={() => handleDelete(record.id)} className="text-red-500 hover:text-red-700 font-pixel text-[10px] px-2 py-1">
-                    Delete
-                  </button>
+
+                  {deleteConfirmId === record.id ? (
+                    <div className="flex flex-col items-end gap-2 bg-red-50 dark:bg-red-950 p-2 border border-red-200 dark:border-red-800 rounded">
+                      <div className="text-right">
+                        <h5 className="font-pixel text-[10px] text-red-700 dark:text-red-400">ยืนยันการลบเรทแลกเงิน</h5>
+                        <p className="font-mono text-[9px] text-red-600 dark:text-red-300 mt-1">
+                          คุณแน่ใจหรือไม่ว่าต้องการลบรายการเรทแลกเงินนี้? การดำเนินการนี้ไม่สามารถยกเลิกได้
+                        </p>
+                      </div>
+                      <div className="flex gap-2">
+                        <button onClick={() => setDeleteConfirmId(null)} className="font-pixel text-[9px] px-2 py-1 bg-stone-200 text-stone-800 dark:bg-stone-700 dark:text-stone-200">
+                          ยกเลิก (Cancel)
+                        </button>
+                        <button onClick={() => handleDelete(record.id)} className="font-pixel text-[9px] px-2 py-1 bg-red-600 text-white hover:bg-red-700">
+                          ลบรายการ (Delete)
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex gap-2">
+                      <button onClick={() => handleEditClick(record)} className="text-stone-500 hover:text-stone-700 dark:text-stone-400 font-pixel text-[10px] px-2 py-1">
+                        ✏️ Edit
+                      </button>
+                      <button onClick={() => setDeleteConfirmId(record.id)} className="text-red-500 hover:text-red-700 font-pixel text-[10px] px-2 py-1">
+                        🗑️ Delete
+                      </button>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
