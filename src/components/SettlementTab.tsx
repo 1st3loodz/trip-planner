@@ -10,9 +10,15 @@ interface SettlementTabProps {
 
 export default function SettlementTab({ trip, currentUserId, onToggleExpenseSettle }: SettlementTabProps) {
   const [expandedDates, setExpandedDates] = useState<Record<string, boolean>>({});
+  const [settledTransfers, setSettledTransfers] = useState<Record<string, boolean>>({});
 
   const toggleDateGroup = (dateKey: string) => {
     setExpandedDates(prev => ({ ...prev, [dateKey]: !prev[dateKey] }));
+  };
+
+  const handleToggleTransferSettle = (fromId: string, toId: string) => {
+    const key = `${fromId}_${toId}`;
+    setSettledTransfers(prev => ({ ...prev, [key]: !prev[key] }));
   };
 
   const tripRates = (trip as any).exchangeRates || null;
@@ -52,16 +58,49 @@ export default function SettlementTab({ trip, currentUserId, onToggleExpenseSett
             </p>
           ) : (
             <div className="space-y-2">
-              {transfers.map((t, idx) => (
-                <div key={idx} className="flex items-center justify-between p-3 bg-amber-50 rounded-xl border border-amber-100 text-sm">
-                  <span className="font-medium text-amber-950">
-                    <strong>{t.from}</strong> 👉 โอนให้ 👉 <strong>{t.to}</strong>
-                  </span>
-                  <span className="font-bold text-amber-900">
-                    ฿{t.amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                  </span>
-                </div>
-              ))}
+              {transfers.map((t, idx) => {
+                const pairKey = `${(t as any).fromId || t.from}_${(t as any).toId || t.to}`;
+                const isSettled = Boolean(settledTransfers[pairKey]);
+                
+                return (
+                  <div
+                    key={pairKey}
+                    className={`flex items-center justify-between p-3.5 rounded-xl border transition-all ${
+                      isSettled
+                        ? "bg-gray-100/80 border-gray-200 opacity-60"
+                        : "bg-amber-50 border-amber-200"
+                    }`}
+                  >
+                    {/* Left: Checkbox + Transfer Names */}
+                    <div className="flex items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={() => handleToggleTransferSettle(t.from, t.to)}
+                        className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 transition-all ${
+                          isSettled
+                            ? "border-[#4a7c59] bg-[#4a7c59] text-white"
+                            : "border-amber-400 bg-white hover:border-amber-500"
+                        }`}
+                      >
+                        {isSettled && (
+                          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="2,6 5,9 10,3" />
+                          </svg>
+                        )}
+                      </button>
+
+                      <span className={`font-medium text-sm ${isSettled ? "line-through text-gray-400" : "text-amber-950"}`}>
+                        <strong>{t.from}</strong> 👉 โอนให้ 👉 <strong>{t.to}</strong>
+                      </span>
+                    </div>
+
+                    {/* Right: Transfer Amount */}
+                    <span className={`font-bold text-sm ${isSettled ? "line-through text-gray-400" : "text-amber-900"}`}>
+                      ฿{t.amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
