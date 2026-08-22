@@ -39,49 +39,53 @@ export default function IndividualSummary({ expenses, participants, customCatego
   const allGroups = useMemo<DayGroup[]>(() => {
     const map = new Map<string, LedgerEntry[]>();
     for (const exp of expenses) {
+      const isForeign = exp.currency && exp.currency !== baseCurrency;
       const effectiveRate = getExchangeRate(exp);
-      const isLegacy = exp.foreignAmount === undefined && (exp as any).foreign_amount === undefined && exp.currency !== baseCurrency;
-      
-      const totalBillTHB = getConvertedAmountTHB(exp);
-        
-      const actualPaidById = resolvePayerId(exp, participants);
-      
-      const getShareForeign = (amtBase: number) => isLegacy ? amtBase : amtBase / effectiveRate;
+      const foreignTotal = Number((exp as any).foreign_amount || exp.foreignAmount || (isForeign ? exp.amount : 0));
+      const splitArray = Array.isArray((exp as any).split_members) && (exp as any).split_members.length > 0 
+        ? (exp as any).split_members 
+        : exp.splits;
+      const splitCount = splitArray?.length || 1;
 
-      if (exp.isExcluded) {
-        const split = exp.splits.find((s) => s.participantId === selectedId);
-        if (actualPaidById === selectedId || split) {
-          const list = map.get(exp.date) ?? [];
-          
-          let memberShareTHB = 0;
-          if (actualPaidById === selectedId) {
-            memberShareTHB = totalBillTHB;
-          } else if (split) {
-            if (exp.splitType === 'CUSTOM') {
-              memberShareTHB = isLegacy ? Number(split.amount) * effectiveRate : Number(split.amount);
-            } else {
-              memberShareTHB = totalBillTHB / (exp.splits.length || 1);
-            }
-          }
-          
-          list.push({ expense: exp, share: getShareForeign(memberShareTHB), shareBase: memberShareTHB, isPersonal: true });
-          map.set(exp.date, list);
-        }
+      const mySplit = splitArray?.find((s: any) => String(s?.participantId || s?.id || s).trim() === String(selectedId).trim());
+      const actualPaidById = resolvePayerId(exp, participants);
+      const isPayer = actualPaidById === selectedId;
+
+      if (exp.isExcluded && !isPayer && !mySplit) {
         continue;
       }
-      
-      const split = exp.splits.find((s) => s.participantId === selectedId);
-      if (!split) continue;
-      
-      const list = map.get(exp.date) ?? [];
-      let memberShareTHB = 0;
-      if (exp.splitType === 'CUSTOM') {
-        memberShareTHB = isLegacy ? Number(split.amount) * effectiveRate : Number(split.amount);
-      } else {
-        memberShareTHB = totalBillTHB / (exp.splits.length || 1);
+      if (!exp.isExcluded && !mySplit) {
+        continue;
       }
-      
-      list.push({ expense: exp, share: getShareForeign(memberShareTHB), shareBase: memberShareTHB, isPersonal: false });
+
+      let myForeignShare = 0;
+      let myTHBShare = 0;
+
+      if (isForeign) {
+        if (isPayer && exp.isExcluded) {
+           myForeignShare = foreignTotal;
+        } else if (mySplit && typeof mySplit === 'object' && (mySplit as any).foreign_amount !== undefined) {
+          myForeignShare = Number((mySplit as any).foreign_amount);
+        } else if (exp.splitType === 'CUSTOM' && mySplit && typeof mySplit === 'object' && mySplit.amount !== undefined) {
+          const isLegacy = exp.foreignAmount === undefined && (exp as any).foreign_amount === undefined;
+          myForeignShare = isLegacy ? Number(mySplit.amount) : Number(mySplit.amount) / effectiveRate;
+        } else {
+          myForeignShare = foreignTotal / splitCount;
+        }
+        myTHBShare = myForeignShare * effectiveRate;
+      } else {
+        if (isPayer && exp.isExcluded) {
+          myTHBShare = Number(exp.amount);
+        } else {
+          myTHBShare = mySplit && typeof mySplit === 'object' && mySplit.amount !== undefined && exp.splitType === 'CUSTOM'
+            ? Number(mySplit.amount)
+            : (Number(exp.amount) || 0) / splitCount;
+        }
+        myForeignShare = myTHBShare;
+      }
+
+      const list = map.get(exp.date) ?? [];
+      list.push({ expense: exp, share: myForeignShare, shareBase: myTHBShare, isPersonal: exp.isExcluded });
       map.set(exp.date, list);
     }
     return Array.from(map.entries())
