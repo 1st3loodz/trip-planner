@@ -1,7 +1,8 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Trip } from "@/types/trip";
 import { calculateSettlement, convertToTHB, isSharedExpense, getExpenseExchangeRate } from "@/utils/settlement";
 import Avatar from "@/components/Avatar";
+import { useTrips } from "@/contexts/TripContext";
 
 interface SettlementTabProps {
   trip: Trip;
@@ -10,17 +11,29 @@ interface SettlementTabProps {
 }
 
 export default function SettlementTab({ trip, currentUserId, onToggleExpenseSettle }: SettlementTabProps) {
+  const { updateTrip } = useTrips();
   const [expandedDates, setExpandedDates] = useState<Record<string, boolean>>({});
   const [settledTransfers, setSettledTransfers] = useState<Record<string, boolean>>({});
   const [selectedMemberFilter, setSelectedMemberFilter] = useState<string | "all">("all");
+
+  useEffect(() => {
+    if (trip?.settled_transfers) {
+      setSettledTransfers(trip.settled_transfers);
+    }
+  }, [trip?.settled_transfers]);
 
   const toggleDateGroup = (dateKey: string) => {
     setExpandedDates(prev => ({ ...prev, [dateKey]: !prev[dateKey] }));
   };
 
-  const handleToggleTransferSettle = (fromId: string, toId: string) => {
+  const handleToggleTransferSettle = async (fromId: string, toId: string) => {
     const key = `${fromId}_${toId}`;
-    setSettledTransfers(prev => ({ ...prev, [key]: !prev[key] }));
+    const nextState = {
+      ...settledTransfers,
+      [key]: !settledTransfers[key]
+    };
+    setSettledTransfers(nextState);
+    await updateTrip(trip.id, { settled_transfers: nextState });
   };
 
   const tripRates = (trip as any).exchangeRates || null;

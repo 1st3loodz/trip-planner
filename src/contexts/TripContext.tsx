@@ -70,6 +70,7 @@ function dbRowToTrip(row: any, participants: any[] = []): Trip {
     expenses:         row.expenses        ?? [],
     customCategories: row.custom_categories ?? [],
     exchange_records: row.exchange_records ?? [],
+    settled_transfers: row.settled_transfers ?? {},
   };
 }
 

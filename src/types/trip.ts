@@ -175,6 +175,7 @@ export interface Trip {
   baseCurrency?: Currency;
   notice?: string;
   exchange_records?: ExchangeRecord[];
+  settled_transfers?: Record<string, boolean>;
   /** UUID of the user who created this trip — used for ownership checks */
   createdBy?: string;
 }
