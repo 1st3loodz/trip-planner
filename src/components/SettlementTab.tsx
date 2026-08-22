@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Trip } from "@/types/trip";
 import { calculateSettlement, convertToTHB, isSharedExpense, getExpenseExchangeRate } from "@/utils/settlement";
+import Avatar from "@/components/Avatar";
 
 interface SettlementTabProps {
   trip: Trip;
@@ -11,6 +12,7 @@ interface SettlementTabProps {
 export default function SettlementTab({ trip, currentUserId, onToggleExpenseSettle }: SettlementTabProps) {
   const [expandedDates, setExpandedDates] = useState<Record<string, boolean>>({});
   const [settledTransfers, setSettledTransfers] = useState<Record<string, boolean>>({});
+  const [selectedMemberFilter, setSelectedMemberFilter] = useState<string | "all">("all");
 
   const toggleDateGroup = (dateKey: string) => {
     setExpandedDates(prev => ({ ...prev, [dateKey]: !prev[dateKey] }));
@@ -24,13 +26,21 @@ export default function SettlementTab({ trip, currentUserId, onToggleExpenseSett
   const tripRates = (trip as any).exchangeRates || null;
   const { transfers } = calculateSettlement(trip.expenses, trip.participants, tripRates);
   
-  const validExpenses = [...trip.expenses].filter(isSharedExpense).sort((a: any, b: any) => {
+  const visibleExpenses = trip.expenses.filter((e: any) => {
+    if (selectedMemberFilter === "all") return isSharedExpense(e);
+    
+    const isPayer = String(e.paid_by || e.paidById || e.payer_id || '').trim() === selectedMemberFilter;
+    const splits = Array.isArray(e.split_members) ? e.split_members : (Array.isArray(e.splits) ? e.splits : []);
+    const isInSplit = splits.some((s: any) => String(s?.participantId || s?.id || s).trim() === selectedMemberFilter);
+    
+    return isSharedExpense(e) && (isPayer || isInSplit);
+  }).sort((a: any, b: any) => {
     const dateA = new Date(a.date || a.expense_date || a.created_at || a.createdAt || 0).getTime();
     const dateB = new Date(b.date || b.expense_date || b.created_at || b.createdAt || 0).getTime();
     return dateA - dateB;
   });
 
-  const groupedExpenses = validExpenses.reduce((acc, expense: any) => {
+  const groupedExpenses = visibleExpenses.reduce((acc, expense: any) => {
     const rawDate = expense.date || expense.expense_date || expense.created_at;
     let dateKey = "Other / ไม่ระบุวันที่";
     if (rawDate) {
@@ -107,7 +117,43 @@ export default function SettlementTab({ trip, currentUserId, onToggleExpenseSett
 
         {/* Expense Breakdown List */}
         <div className="bg-white rounded-2xl p-5 border shadow-sm mt-6">
-          <h4 className="font-semibold text-gray-800 text-sm mb-3">📋 รายการค่าใช้จ่ายทั้งหมด ({validExpenses.length} รายการ)</h4>
+          <div className="mb-4 space-y-3">
+            <h4 className="font-semibold text-gray-800 text-sm">📋 รายการค่าใช้จ่ายทั้งหมด ({visibleExpenses.length} รายการ)</h4>
+            
+            {/* Member Filter Bar */}
+            <div className="flex overflow-x-auto pb-2 scrollbar-hide gap-2 items-center">
+              <button
+                type="button"
+                onClick={() => setSelectedMemberFilter("all")}
+                className={`shrink-0 px-4 py-1.5 rounded-full text-xs font-semibold font-mono border-2 transition-all ${
+                  selectedMemberFilter === "all"
+                    ? "bg-[#4a7c59] border-[#4a7c59] text-white"
+                    : "bg-white border-gray-200 text-gray-700 hover:border-gray-300"
+                }`}
+              >
+                ทั้งหมด (All)
+              </button>
+              
+              {trip.participants.map((p) => {
+                const isActive = selectedMemberFilter === p.id;
+                return (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => setSelectedMemberFilter(p.id)}
+                    className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold font-mono border-2 transition-all ${
+                      isActive
+                        ? "bg-[#4a7c59] border-[#4a7c59] text-white"
+                        : "bg-white border-gray-200 text-gray-700 hover:border-gray-300"
+                    }`}
+                  >
+                    <Avatar name={p.name} colorClass={p.color} size="xs" tooltip={false} />
+                    {p.name}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
           <div className="space-y-4">
             {Object.entries(groupedExpenses).map(([dateKey, groupExpenses]) => {
               const isExpanded = Boolean(expandedDates[dateKey]);
