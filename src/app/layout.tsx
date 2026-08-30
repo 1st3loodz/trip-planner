@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Press_Start_2P } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/ThemeProvider";
@@ -13,6 +13,10 @@ const pressStart2P = Press_Start_2P({
 });
 
 import ClientAuthGuard from "@/components/ClientAuthGuard";
+
+export const viewport: Viewport = {
+  themeColor: "#f5efe6",
+};
 
 export const metadata: Metadata = {
   title: "Nomadic Journey — Cozy Adventure Journal",
@@ -30,7 +34,7 @@ export const metadata: Metadata = {
       { url: "/icon-512.png", sizes: "512x512", type: "image/png" },
     ],
     apple: [
-      { url: "/icon-192.png", sizes: "192x192" },
+      { url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" },
     ],
   },
 };
