@@ -61,6 +61,17 @@ export default function Sidebar({ user }: { user: User }) {
     }
   }, [user, supabase]);
 
+  /** Returns true when avatar_url is a network URL (not an emoji glyph). */
+  const isUrl = (s: string) => typeof s === "string" && (s.startsWith("http://") || s.startsWith("https://") || s.startsWith("/"));
+
+  /** Safely render an avatar: emoji → text node, URL → <img>, anything else → fallback emoji. */
+  const renderAvatarIcon = (avatarUrl: string | undefined, sizeCls = "text-4xl") => {
+    if (!avatarUrl || isUrl(avatarUrl)) {
+      return <span className={sizeCls}>🤠</span>;
+    }
+    return <span className={sizeCls}>{avatarUrl}</span>;
+  };
+
   useEffect(() => {
     async function fetchProfile() {
       const { data, error } = await supabase
@@ -70,7 +81,16 @@ export default function Sidebar({ user }: { user: User }) {
         .single();
 
       if (data) {
-        setProfile(data);
+        // If the stored avatar_url is a raw image URL (e.g. from Google OAuth),
+        // overwrite it with a random retro emoji and re-save so it never leaks as plain text.
+        if (isUrl(data.avatar_url)) {
+          const safeEmoji = AVATAR_OPTIONS[Math.floor(Math.random() * AVATAR_OPTIONS.length)].icon;
+          const patched = { ...data, avatar_url: safeEmoji };
+          setProfile(patched);
+          supabase.from("profiles").update({ avatar_url: safeEmoji }).eq("id", user.id);
+        } else {
+          setProfile(data);
+        }
       } else if (error && error.code === "PGRST116") {
         // No profile found, let's upsert a default one
         const defaultProfile = {
@@ -193,7 +213,7 @@ export default function Sidebar({ user }: { user: User }) {
             {profile ? (
               <div className="flex flex-col items-center">
                 <div className="text-4xl mb-2 group-hover:scale-110 transition-transform">
-                  {profile.avatar_url}
+                  {renderAvatarIcon(profile.avatar_url, "text-4xl")}
                 </div>
                 <div className="font-mono text-xs font-bold text-stone-800 dark:text-[#fdfbf7]">
                   {profile.nickname}
@@ -244,7 +264,7 @@ export default function Sidebar({ user }: { user: User }) {
                   return (
                     <div key={result.id} className="flex items-center justify-between bg-[#fdfbf7] dark:bg-[#1e1815] border-2 border-stone-300 dark:border-stone-700 p-2">
                       <div className="flex items-center gap-2">
-                        <span className="text-xl">{result.avatar_url}</span>
+                        <span className="text-xl">{renderAvatarIcon(result.avatar_url, "text-xl")}</span>
                         <span className="font-mono text-[10px] font-bold text-stone-800 dark:text-stone-200">{result.nickname}</span>
                       </div>
                       {!isFriend ? (
@@ -279,7 +299,7 @@ export default function Sidebar({ user }: { user: User }) {
                     onClick={() => setSelectedCrewMember(friend)}
                     className="w-full text-left flex items-center gap-3 p-2 bg-[#fdfbf7] dark:bg-[#1e1815] border-2 border-stone-400 dark:border-stone-600 shadow-[2px_2px_0_rgba(0,0,0,0.1)] hover:bg-[#f5eed7] dark:hover:bg-[#28211d] transition-colors cursor-pointer active:translate-x-px active:translate-y-px active:shadow-none"
                   >
-                    <span className="text-2xl">{friend.avatar_url}</span>
+                    <span className="text-2xl">{renderAvatarIcon(friend.avatar_url, "text-2xl")}</span>
                     <span className="font-mono text-xs font-bold text-stone-800 dark:text-stone-200">{friend.nickname}</span>
                   </button>
                 ))
@@ -315,7 +335,7 @@ export default function Sidebar({ user }: { user: User }) {
 
             <div className="flex flex-col items-center mb-6">
               <div className="text-6xl mb-3 border-4 border-stone-800 dark:border-[#54463d] bg-[#e8dcc4] dark:bg-[#362d28] p-4 shadow-[4px_4px_0_#292524] dark:shadow-[4px_4px_0_#1e1815]">
-                {selectedCrewMember.avatar_url}
+                {renderAvatarIcon(selectedCrewMember.avatar_url, "text-6xl")}
               </div>
               <h2 className="font-mono text-lg font-black text-stone-800 dark:text-[#fdfbf7]">
                 {selectedCrewMember.nickname}
