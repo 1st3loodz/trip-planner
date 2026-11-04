@@ -47,7 +47,8 @@ export default function SettlementTab({ trip, currentUserId, onToggleExpenseSett
     const splits = Array.isArray(e.split_members) ? e.split_members : (Array.isArray(e.splits) ? e.splits : []);
     const isInSplit = splits.some((s: any) => String(s?.participantId || s?.id || s).trim() === selectedMemberFilter);
     
-    return isSharedExpense(e) && (isPayer || isInSplit);
+    // Member view: only debts this member owes to another payer (hide credit items where they paid)
+    return isSharedExpense(e) && !isPayer && isInSplit && getParticipantShareTHB(e, selectedMemberFilter, tripRates) > 0.005;
   }).sort((a: any, b: any) => {
     const dateA = new Date(a.date || a.expense_date || a.created_at || a.createdAt || 0).getTime();
     const dateB = new Date(b.date || b.expense_date || b.created_at || b.createdAt || 0).getTime();
@@ -171,6 +172,11 @@ export default function SettlementTab({ trip, currentUserId, onToggleExpenseSett
               })}
             </div>
           </div>
+          {selectedMemberFilter !== "all" && visibleExpenses.length === 0 && (
+            <p className="text-gray-500 text-sm text-center py-4 bg-white rounded-xl border border-dashed border-gray-300">
+              ไม่มีรายการที่ต้องชำระ (คุณเป็นผู้สำรองจ่าย/ไม่มีหนี้ค้าง)
+            </p>
+          )}
           <div className="space-y-4">
             {Object.entries(groupedExpenses).map(([dateKey, groupExpenses]) => {
               const isExpanded = Boolean(expandedDates[dateKey]);
