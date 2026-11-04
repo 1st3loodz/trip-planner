@@ -251,6 +251,7 @@ export default function SettlementTab({ trip, currentUserId, onToggleExpenseSett
                       {enhancedGroup.map((expense: any) => (
                         <div key={expense.id} className={`bg-gray-50 rounded-xl border border-gray-100 overflow-hidden transition-colors ${expense.isSettled ? 'opacity-50' : 'hover:bg-gray-100'}`}>
                           <div className="flex items-center p-3 gap-3">
+                            {selectedMemberFilter !== "all" && (
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -268,6 +269,7 @@ export default function SettlementTab({ trip, currentUserId, onToggleExpenseSett
                             >
                               {expense.isSettled && <span className="text-[10px] font-bold">✓</span>}
                             </button>
+                            )}
 
                             <div className="flex flex-col flex-1 min-w-0">
                               <span className={`font-semibold text-sm ${expense.isSettled ? 'text-gray-400 line-through' : 'text-gray-800'}`}>
