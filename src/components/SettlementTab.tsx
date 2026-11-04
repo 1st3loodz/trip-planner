@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Trip } from "@/types/trip";
-import { calculateSettlement, convertToTHB, isSharedExpense, getExpenseExchangeRate, getParticipantShareTHB } from "@/utils/settlement";
+import { calculateSettlement, convertToTHB, isSharedExpense, getExpenseExchangeRate, getParticipantShareTHB, isParticipantSettled } from "@/utils/settlement";
 import Avatar from "@/components/Avatar";
 import { useTrips } from "@/contexts/TripContext";
 
@@ -8,9 +8,10 @@ interface SettlementTabProps {
   trip: Trip;
   currentUserId?: string | null;
   onToggleExpenseSettle: (expenseId: string, currentStatus: boolean) => void;
+  onToggleParticipantSettle: (expenseId: string, participantId: string) => void;
 }
 
-export default function SettlementTab({ trip, currentUserId, onToggleExpenseSettle }: SettlementTabProps) {
+export default function SettlementTab({ trip, currentUserId, onToggleExpenseSettle, onToggleParticipantSettle }: SettlementTabProps) {
   const { updateTrip } = useTrips();
   const [expandedDates, setExpandedDates] = useState<Record<string, boolean>>({});
   const [settledTransfers, setSettledTransfers] = useState<Record<string, boolean>>({});
@@ -184,7 +185,9 @@ export default function SettlementTab({ trip, currentUserId, onToggleExpenseSett
                 const isForeign = expense.currency && expense.currency !== 'THB';
                 const splits = expense.split_members || expense.splits || [];
                 const splitCount = Array.isArray(splits) ? splits.length : 1;
-                const isSettled = expense.is_settled || expense.isSettled || false;
+                const isSettled = selectedMemberFilter !== "all"
+                  ? isParticipantSettled(expense, selectedMemberFilter)
+                  : Boolean(expense.is_settled || expense.isSettled);
 
                 let myShareInTHB = 0;
                 let netImpact = 0;
@@ -245,7 +248,11 @@ export default function SettlementTab({ trip, currentUserId, onToggleExpenseSett
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
-                                onToggleExpenseSettle(expense.id, expense.isSettled);
+                                if (selectedMemberFilter !== "all") {
+                                  onToggleParticipantSettle(expense.id, selectedMemberFilter);
+                                } else {
+                                  onToggleExpenseSettle(expense.id, expense.isSettled);
+                                }
                               }}
                               className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 transition-colors ${
                                 expense.isSettled

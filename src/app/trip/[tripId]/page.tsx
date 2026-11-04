@@ -241,6 +241,32 @@ export default function TripDetailPage({ params }: { params: Promise<{ tripId: s
     }
   };
 
+  // Toggle settled status for ONE participant's share only (stored inside split_members)
+  const handleToggleParticipantSettle = async (expenseId: string, participantId: string) => {
+    if (!trip) return;
+    try {
+      const pid = String(participantId).trim();
+      const toggleIn = (arr: any[]) => arr.map((s: any) => {
+        const sId = String(s?.participantId || s?.id || s).trim();
+        if (sId !== pid) return s;
+        const current = Boolean(s?.isSettled ?? s?.is_settled);
+        return typeof s === 'object' && s !== null
+          ? { ...s, isSettled: !current, is_settled: !current }
+          : { participantId: sId, isSettled: !current, is_settled: !current };
+      });
+      const updatedExpenses = trip.expenses.map((e: any) => {
+        if (e.id !== expenseId) return e;
+        const next: any = { ...e };
+        if (Array.isArray(e.split_members)) next.split_members = toggleIn(e.split_members);
+        if (Array.isArray(e.splits)) next.splits = toggleIn(e.splits);
+        return next;
+      });
+      await updateTrip(trip.id, { expenses: updatedExpenses });
+    } catch (err) {
+      console.error("Error toggling participant settle status:", err);
+    }
+  };
+
   if (!isLoaded) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#f4ecd8] dark:bg-[#28211d]">
@@ -335,7 +361,7 @@ export default function TripDetailPage({ params }: { params: Promise<{ tripId: s
             isGroupTrip={isGroupTrip}
           />
         ) : activeTab === "settlement" ? (
-          <SettlementTab trip={trip} currentUserId={userId} onToggleExpenseSettle={handleToggleExpenseSettle} />
+          <SettlementTab trip={trip} currentUserId={userId} onToggleExpenseSettle={handleToggleExpenseSettle} onToggleParticipantSettle={handleToggleParticipantSettle} />
         ) : null}
       </div>
 

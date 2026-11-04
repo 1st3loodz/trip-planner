@@ -90,6 +90,21 @@ export const getParticipantShareTHB = (
   return convertToTHB(e, tripRates) / (splits.length || 1);
 };
 
+/**
+ * Whether a specific participant has settled their share of an expense.
+ * Reads the per-member flag inside split_members (or splits).
+ */
+export const isParticipantSettled = (expense: any, participantId: string): boolean => {
+  if (!expense) return false;
+  const splits = Array.isArray(expense.split_members) && expense.split_members.length > 0
+    ? expense.split_members
+    : (Array.isArray(expense.splits) ? expense.splits : []);
+  const mId = String(participantId || '').trim();
+  const split = splits.find((s: any) => String(s?.participantId || s?.id || s).trim() === mId);
+  if (!split || typeof split !== 'object') return false;
+  return Boolean(split.isSettled ?? split.is_settled);
+};
+
 export const isSharedExpense = (e: Expense | any): boolean => {
   if (!e) return false;
   const splits = e.split_members || e.splits || [];
@@ -137,7 +152,7 @@ export const calculateSettlement = (
       const debtorId = String(split?.participantId || split?.id || split || '').trim();
       if (!debtMatrix[debtorId]) continue; // Safety check if member was removed but expense persists
 
-      if (debtorId !== creditorId) {
+      if (debtorId !== creditorId && !isParticipantSettled(expense, debtorId)) {
         const debtorShare = getParticipantShareTHB(expense, debtorId, tripRates);
 
         debtMatrix[debtorId][creditorId] += debtorShare;
