@@ -53,6 +53,9 @@ export default function SettlementTab({ trip, currentUserId, onToggleExpenseSett
     return dateA - dateB;
   });
 
+  // Whose share to display: selected member tab, otherwise the logged-in user
+  const viewerId = selectedMemberFilter !== "all" ? String(selectedMemberFilter).trim() : (currentUserId ? String(currentUserId).trim() : null);
+
   const groupedExpenses = visibleExpenses.reduce((acc, expense: any) => {
     const rawDate = expense.date || expense.expense_date || expense.created_at;
     let dateKey = "Other / ไม่ระบุวันที่";
@@ -186,13 +189,9 @@ export default function SettlementTab({ trip, currentUserId, onToggleExpenseSett
                 let myShareInTHB = 0;
                 let netImpact = 0;
 
-                if (currentUserId) {
-                  const currentId = String(currentUserId).trim();
-                  const mySplit = splits.find((s: any) => String(s?.participantId || s?.id || s).trim() === currentId);
-                  
-                  if (mySplit) {
-                    myShareInTHB = getParticipantShareTHB(expense, currentId, tripRates);
-                  }
+                if (viewerId) {
+                  const currentId = viewerId;
+                  myShareInTHB = getParticipantShareTHB(expense, currentId, tripRates);
 
                   const isPayer = payerId === currentId;
                   if (isPayer) {
@@ -223,7 +222,7 @@ export default function SettlementTab({ trip, currentUserId, onToggleExpenseSett
                       </span>
                     </div>
                     <div className="flex items-center gap-3">
-                      {currentUserId && Math.abs(dailyNetImpact) > 0.01 ? (
+                      {viewerId && Math.abs(dailyNetImpact) > 0.01 ? (
                         <span className={`text-xs font-bold ${dailyNetImpact > 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
                           {dailyNetImpact > 0 ? '+' : '-'}฿{Math.abs(dailyNetImpact).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                         </span>
@@ -280,6 +279,19 @@ export default function SettlementTab({ trip, currentUserId, onToggleExpenseSett
                               )}
                             </div>
                           </div>
+                          {selectedMemberFilter === "all" && Array.isArray(expense.split_members || expense.splits) && (
+                            <div className="flex flex-wrap gap-1.5 px-3 pb-2.5 pl-11">
+                              {(expense.split_members || expense.splits).map((s: any) => {
+                                const pid = String(s?.participantId || s?.id || s).trim();
+                                const pn = trip.participants.find(m => String(m.id).trim() === pid)?.name || pid;
+                                return (
+                                  <span key={pid} className="text-[10px] text-gray-500 bg-white border border-gray-200 rounded-md px-1.5 py-0.5">
+                                    {pn}: ฿{getParticipantShareTHB(expense, pid, tripRates).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                  </span>
+                                );
+                              })}
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>
