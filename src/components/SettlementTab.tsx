@@ -224,7 +224,7 @@ export default function SettlementTab({ trip, currentUserId, onToggleExpenseSett
                       </span>
                     </div>
                     <div className="flex items-center gap-3">
-                      {viewerId && Math.abs(dailyNetImpact) > 0.01 ? (
+                      {selectedMemberFilter !== "all" && viewerId && Math.abs(dailyNetImpact) > 0.01 ? (
                         <span className={`text-xs font-bold ${dailyNetImpact > 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
                           {dailyNetImpact > 0 ? '+' : '-'}฿{Math.abs(dailyNetImpact).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                         </span>
@@ -266,11 +266,7 @@ export default function SettlementTab({ trip, currentUserId, onToggleExpenseSett
                               </span>
                             </div>
                             <div className="flex flex-col items-end">
-                              {selectedMemberFilter === "all" && expense.isCustomSplit ? (
-                                <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md border ${expense.isSettled ? 'text-gray-400 border-gray-200 line-through' : 'text-amber-700 bg-amber-50 border-amber-200'}`}>
-                                  Custom
-                                </span>
-                              ) : expense.netImpact > 0.01 ? (
+                              {selectedMemberFilter === "all" ? null : expense.netImpact > 0.01 ? (
                                 <span className={`font-bold ${expense.isSettled ? 'text-gray-400 line-through' : 'text-emerald-600 dark:text-emerald-400'}`}>
                                   +฿{expense.netImpact.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                                 </span>
