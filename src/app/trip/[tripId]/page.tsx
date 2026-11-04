@@ -267,6 +267,37 @@ export default function TripDetailPage({ params }: { params: Promise<{ tripId: s
     }
   };
 
+  // Settle / unsettle every item where `debtorId` owes `creditorId` (Transfer Plan card toggle)
+  const handleSetPairSettled = async (debtorId: string, creditorId: string, settled: boolean) => {
+    if (!trip) return;
+    try {
+      const dId = String(debtorId).trim();
+      const cId = String(creditorId).trim();
+      const setIn = (arr: any[]) => arr.map((s: any) => {
+        const sId = String(s?.participantId || s?.id || s).trim();
+        if (sId !== dId) return s;
+        return typeof s === 'object' && s !== null
+          ? { ...s, isSettled: settled, is_settled: settled }
+          : { participantId: sId, isSettled: settled, is_settled: settled };
+      });
+      const updatedExpenses = trip.expenses.map((e: any) => {
+        const payer = String(e.paid_by || e.paidById || e.payer_id || '').trim();
+        if (payer !== cId) return e;
+        const inSplit = (Array.isArray(e.split_members) ? e.split_members : (Array.isArray(e.splits) ? e.splits : []))
+          .some((s: any) => String(s?.participantId || s?.id || s).trim() === dId);
+        if (!inSplit) return e;
+        const next: any = { ...e };
+        if (Array.isArray(e.split_members)) next.split_members = setIn(e.split_members);
+        if (Array.isArray(e.splits)) next.splits = setIn(e.splits);
+        if (!settled && (e.is_settled || e.isSettled)) { next.is_settled = false; next.isSettled = false; }
+        return next;
+      });
+      await updateTrip(trip.id, { expenses: updatedExpenses });
+    } catch (err) {
+      console.error("Error toggling transfer pair settle status:", err);
+    }
+  };
+
   if (!isLoaded) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#f4ecd8] dark:bg-[#28211d]">
@@ -361,7 +392,7 @@ export default function TripDetailPage({ params }: { params: Promise<{ tripId: s
             isGroupTrip={isGroupTrip}
           />
         ) : activeTab === "settlement" ? (
-          <SettlementTab trip={trip} currentUserId={userId} onToggleExpenseSettle={handleToggleExpenseSettle} onToggleParticipantSettle={handleToggleParticipantSettle} />
+          <SettlementTab trip={trip} currentUserId={userId} onToggleExpenseSettle={handleToggleExpenseSettle} onToggleParticipantSettle={handleToggleParticipantSettle} onSetPairSettled={handleSetPairSettled} />
         ) : null}
       </div>
 

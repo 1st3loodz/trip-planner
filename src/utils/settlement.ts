@@ -191,3 +191,69 @@ export const calculateSettlement = (
 
   return { transfers };
 };
+
+export interface TransferPlanItem extends SettlementTransfer {
+  fromId: string;
+  toId: string;
+  /** Remaining unsettled amount (0 when every item in this direction is settled) */
+  remaining: number;
+}
+
+const buildDebtMatrix = (
+  expenses: any[],
+  members: Participant[],
+  tripRates: Record<string, number> | null | undefined,
+  ignoreSettled: boolean
+): Record<string, Record<string, number>> => {
+  const matrix: Record<string, Record<string, number>> = {};
+  members.forEach(m => {
+    matrix[m.id] = {};
+    members.forEach(m2 => { matrix[m.id][m2.id] = 0; });
+  });
+  for (const expense of (expenses || []).filter(isSharedExpense)) {
+    if (!ignoreSettled && (expense.is_settled || expense.isSettled)) continue;
+    const creditorId = String(expense.paid_by || expense.paidById || expense.payer_id || '').trim();
+    if (!matrix[creditorId]) continue;
+    const splits = Array.isArray(expense.split_members) ? expense.split_members : (Array.isArray(expense.splits) ? expense.splits : []);
+    for (const split of splits) {
+      const debtorId = String(split?.participantId || split?.id || split || '').trim();
+      if (!matrix[debtorId] || debtorId === creditorId) continue;
+      if (!ignoreSettled && isParticipantSettled(expense, debtorId)) continue;
+      matrix[debtorId][creditorId] += getParticipantShareTHB(expense, debtorId, tripRates);
+    }
+  }
+  return matrix;
+};
+
+/**
+ * Transfer plan that stays stable as items get settled: the pair list and `amount`
+ * come from ALL items (settled flags ignored), `remaining` from unsettled items only.
+ */
+export const calculateTransferPlan = (
+  expenses: any[],
+  members: Participant[],
+  tripRates?: Record<string, number> | null
+): TransferPlanItem[] => {
+  const total = buildDebtMatrix(expenses, members, tripRates, true);
+  const open = buildDebtMatrix(expenses, members, tripRates, false);
+  const plan: TransferPlanItem[] = [];
+  for (let i = 0; i < members.length; i++) {
+    for (let j = i + 1; j < members.length; j++) {
+      const A = members[i];
+      const B = members[j];
+      const net = total[A.id][B.id] - total[B.id][A.id];
+      if (Math.abs(net) <= 0.01) continue;
+      const [from, to] = net > 0 ? [A, B] : [B, A];
+      const openNet = open[from.id][to.id] - open[to.id][from.id];
+      plan.push({
+        from: from.name,
+        to: to.name,
+        fromId: from.id,
+        toId: to.id,
+        amount: Math.round(Math.abs(net) * 100) / 100,
+        remaining: openNet > 0.01 ? Math.round(openNet * 100) / 100 : 0,
+      });
+    }
+  }
+  return plan;
+};

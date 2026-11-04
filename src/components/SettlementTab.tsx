@@ -1,44 +1,26 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { Trip } from "@/types/trip";
-import { calculateSettlement, convertToTHB, isSharedExpense, getExpenseExchangeRate, getParticipantShareTHB, isParticipantSettled } from "@/utils/settlement";
+import { calculateTransferPlan, convertToTHB, isSharedExpense, getExpenseExchangeRate, getParticipantShareTHB, isParticipantSettled } from "@/utils/settlement";
 import Avatar from "@/components/Avatar";
-import { useTrips } from "@/contexts/TripContext";
 
 interface SettlementTabProps {
   trip: Trip;
   currentUserId?: string | null;
   onToggleExpenseSettle: (expenseId: string, currentStatus: boolean) => void;
   onToggleParticipantSettle: (expenseId: string, participantId: string) => void;
+  onSetPairSettled: (debtorId: string, creditorId: string, settled: boolean) => void;
 }
 
-export default function SettlementTab({ trip, currentUserId, onToggleExpenseSettle, onToggleParticipantSettle }: SettlementTabProps) {
-  const { updateTrip } = useTrips();
+export default function SettlementTab({ trip, currentUserId, onToggleExpenseSettle, onToggleParticipantSettle, onSetPairSettled }: SettlementTabProps) {
   const [expandedDates, setExpandedDates] = useState<Record<string, boolean>>({});
-  const [settledTransfers, setSettledTransfers] = useState<Record<string, boolean>>({});
   const [selectedMemberFilter, setSelectedMemberFilter] = useState<string | "all">("all");
-
-  useEffect(() => {
-    if (trip?.settled_transfers) {
-      setSettledTransfers(trip.settled_transfers);
-    }
-  }, [trip?.settled_transfers]);
 
   const toggleDateGroup = (dateKey: string) => {
     setExpandedDates(prev => ({ ...prev, [dateKey]: !prev[dateKey] }));
   };
 
-  const handleToggleTransferSettle = async (fromId: string, toId: string) => {
-    const key = `${fromId}_${toId}`;
-    const nextState = {
-      ...settledTransfers,
-      [key]: !settledTransfers[key]
-    };
-    setSettledTransfers(nextState);
-    await updateTrip(trip.id, { settled_transfers: nextState });
-  };
-
   const tripRates = (trip as any).exchangeRates || null;
-  const { transfers } = calculateSettlement(trip.expenses, trip.participants, tripRates);
+  const transfers = calculateTransferPlan(trip.expenses, trip.participants, tripRates);
   
   const visibleExpenses = trip.expenses.filter((e: any) => {
     if (selectedMemberFilter === "all") return isSharedExpense(e);
@@ -87,8 +69,8 @@ export default function SettlementTab({ trip, currentUserId, onToggleExpenseSett
           ) : (
             <div className="space-y-2">
               {transfers.map((t, idx) => {
-                const pairKey = `${(t as any).fromId || t.from}_${(t as any).toId || t.to}`;
-                const isSettled = Boolean(settledTransfers[pairKey]);
+                const pairKey = `${t.fromId}_${t.toId}`;
+                const isSettled = t.remaining <= 0.01;
                 
                 return (
                   <div
@@ -103,7 +85,7 @@ export default function SettlementTab({ trip, currentUserId, onToggleExpenseSett
                     <div className="flex items-center gap-3">
                       <button
                         type="button"
-                        onClick={() => handleToggleTransferSettle(t.from, t.to)}
+                        onClick={() => onSetPairSettled(t.fromId, t.toId, !isSettled)}
                         className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 transition-all ${
                           isSettled
                             ? "border-[#4a7c59] bg-[#4a7c59] text-white"
@@ -124,7 +106,7 @@ export default function SettlementTab({ trip, currentUserId, onToggleExpenseSett
 
                     {/* Right: Transfer Amount */}
                     <span className={`font-bold text-sm ${isSettled ? "line-through text-gray-400" : "text-amber-900"}`}>
-                      ฿{t.amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                      {isSettled ? (<><span className="mr-2 inline-block text-[10px] font-semibold text-emerald-700">เคลียร์ครบแล้ว</span>฿0.00</>) : <>฿{t.remaining.toLocaleString('en-US', { minimumFractionDigits: 2 })}</>}
                     </span>
                   </div>
                 );
