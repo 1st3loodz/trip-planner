@@ -134,7 +134,7 @@ export default function MemberCategoryChart({ memberId, memberName, expenses, pa
               {hoveredSeg ? (EXPENSE_CATEGORY_META[hoveredSeg.cat as ExpenseCategory]?.label || customCategories.find(c=>c.id===hoveredSeg.cat)?.label || hoveredSeg.cat) : memberName}
             </text>
             <text x={CX} y={CY + 9} textAnchor="middle" fontSize="12" fontFamily="monospace" fontWeight="800" fill={hoveredSeg ? (CATEGORY_HEX[hoveredSeg.cat as ExpenseCategory] || "#78716c") : "#4a7c59"}>
-              {hoveredSeg ? `${(Number(hoveredSeg.pct) || 0 * 100).toFixed(1)}%` : formatBase(grandTotal, baseCurrency)}
+              {hoveredSeg ? `${(Number(hoveredSeg.pct) * 100 || 0).toFixed(1)}%` : formatBase(grandTotal, baseCurrency)}
             </text>
             {hoveredSeg && (
               <text x={CX} y={CY + 24} textAnchor="middle" fontSize="8.5" fontFamily="monospace" fill="#78716c">
