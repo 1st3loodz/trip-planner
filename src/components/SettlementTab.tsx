@@ -206,7 +206,9 @@ export default function SettlementTab({ trip, currentUserId, onToggleExpenseSett
                   dailyTotalTHB += thbAmt;
                 }
 
-                return { ...expense, payer, thbAmt, isForeign, splitCount, isSettled, netImpact };
+                const isCustomSplit = expense.split_type === 'custom' || expense.splitType === 'custom' || expense.splitType === 'CUSTOM' ||
+                  (Array.isArray(splits) && splits.some((s: any) => typeof s === 'object' && s !== null && (s.amount !== undefined || s.share !== undefined)));
+                return { ...expense, payer, thbAmt, isForeign, splitCount, isSettled, netImpact, isCustomSplit };
               });
 
               return (
@@ -264,7 +266,11 @@ export default function SettlementTab({ trip, currentUserId, onToggleExpenseSett
                               </span>
                             </div>
                             <div className="flex flex-col items-end">
-                              {expense.netImpact > 0.01 ? (
+                              {selectedMemberFilter === "all" && expense.isCustomSplit ? (
+                                <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md border ${expense.isSettled ? 'text-gray-400 border-gray-200 line-through' : 'text-amber-700 bg-amber-50 border-amber-200'}`}>
+                                  Custom
+                                </span>
+                              ) : expense.netImpact > 0.01 ? (
                                 <span className={`font-bold ${expense.isSettled ? 'text-gray-400 line-through' : 'text-emerald-600 dark:text-emerald-400'}`}>
                                   +฿{expense.netImpact.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                                 </span>
