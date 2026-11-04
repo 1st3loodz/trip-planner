@@ -42,9 +42,9 @@ export default function SettlementV2({ members, expenses }: SettlementV2Props) {
         const mySplit = splits.find((s: any) => String(s?.participantId || s?.id || s).trim() === mId);
         if (!mySplit) return sum;
 
-        if (typeof mySplit === 'object' && mySplit.amount !== undefined) {
+        if (typeof mySplit === 'object' && mySplit !== null && (mySplit.amount !== undefined || mySplit.share !== undefined)) {
           // If the split has an exact amount, convert that split amount to THB
-          const splitAmt = Number(mySplit.amount) || 0;
+          const splitAmt = Number(mySplit.amount !== undefined ? mySplit.amount : mySplit.share) || 0;
           
           const customRate = Number(e.custom_exchange_rate) || Number(e.customExchangeRate) || 0;
           const standardRate = Number(e.exchange_rate) || Number(e.exchangeRate) || 0;

@@ -59,6 +59,37 @@ export const convertToTHB = (
   return foreignAmt * rate;
 };
 
+/**
+ * A participant's share of an expense, converted to THB.
+ * Respects custom per-member amounts (`amount` or `share`) in split_members;
+ * falls back to an equal split only when no custom amount is defined.
+ */
+export const getParticipantShareTHB = (
+  e: any,
+  participantId: string,
+  tripRates?: Record<string, number> | null
+): number => {
+  if (!e) return 0;
+  const splits = Array.isArray(e.split_members) && e.split_members.length > 0
+    ? e.split_members
+    : (Array.isArray(e.splits) ? e.splits : []);
+  if (splits.length === 0) return 0;
+
+  const mId = String(participantId || '').trim();
+  const mySplit = splits.find((s: any) => String(s?.participantId || s?.id || s).trim() === mId);
+  if (!mySplit) return 0;
+
+  const rawAmt = typeof mySplit === 'object' && mySplit !== null
+    ? (mySplit.amount !== undefined ? mySplit.amount : mySplit.share)
+    : undefined;
+
+  if (rawAmt !== undefined && rawAmt !== null && !isNaN(Number(rawAmt))) {
+    return Number(rawAmt) * getExpenseExchangeRate(e, tripRates);
+  }
+
+  return convertToTHB(e, tripRates) / (splits.length || 1);
+};
+
 export const isSharedExpense = (e: Expense | any): boolean => {
   if (!e) return false;
   const splits = e.split_members || e.splits || [];
@@ -107,14 +138,7 @@ export const calculateSettlement = (
       if (!debtMatrix[debtorId]) continue; // Safety check if member was removed but expense persists
 
       if (debtorId !== creditorId) {
-        let debtorShare = 0;
-        const rate = getExpenseExchangeRate(expense, tripRates);
-
-        if (typeof split === 'object' && split.amount !== undefined) {
-          debtorShare = Number(split.amount) * rate;
-        } else {
-          debtorShare = convertToTHB(expense, tripRates) / splits.length;
-        }
+        const debtorShare = getParticipantShareTHB(expense, debtorId, tripRates);
 
         debtMatrix[debtorId][creditorId] += debtorShare;
       }

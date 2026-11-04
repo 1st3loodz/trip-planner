@@ -281,8 +281,8 @@ export default function SettlementCalculator({ settlements, participants, expens
                       ? (Number(e.custom_exchange_rate || e.customExchangeRate) || Number(e.exchange_rate || e.exchangeRate) || 0.209096)
                       : 1;
 
-                    if (typeof mySplit === 'object' && mySplit.amount !== undefined) {
-                      const splitAmt = Number(mySplit.amount) || 0;
+                    if (typeof mySplit === 'object' && mySplit !== null && (mySplit.amount !== undefined || mySplit.share !== undefined)) {
+                      const splitAmt = Number(mySplit.amount !== undefined ? mySplit.amount : mySplit.share) || 0;
                       return sum + (e.currency === 'THB' || !e.currency ? splitAmt : splitAmt * rate);
                     }
                     return sum + (((Number(e.amount) || 0) * rate) / (splits.length || 1));

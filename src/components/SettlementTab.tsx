@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Trip } from "@/types/trip";
-import { calculateSettlement, convertToTHB, isSharedExpense, getExpenseExchangeRate } from "@/utils/settlement";
+import { calculateSettlement, convertToTHB, isSharedExpense, getExpenseExchangeRate, getParticipantShareTHB } from "@/utils/settlement";
 import Avatar from "@/components/Avatar";
 import { useTrips } from "@/contexts/TripContext";
 
@@ -191,12 +191,7 @@ export default function SettlementTab({ trip, currentUserId, onToggleExpenseSett
                   const mySplit = splits.find((s: any) => String(s?.participantId || s?.id || s).trim() === currentId);
                   
                   if (mySplit) {
-                    if (typeof mySplit === 'object' && mySplit.amount !== undefined) {
-                      const rate = getExpenseExchangeRate(expense, tripRates);
-                      myShareInTHB = Number(mySplit.amount) * rate;
-                    } else {
-                      myShareInTHB = thbAmt / (splits.length || 1);
-                    }
+                    myShareInTHB = getParticipantShareTHB(expense, currentId, tripRates);
                   }
 
                   const isPayer = payerId === currentId;
