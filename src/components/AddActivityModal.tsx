@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ActivityItem, ActivityCategory, DayPlan, CandidateLocation, Currency, CURRENCY_META } from "@/types/trip";
+import { ActivityItem, ActivityCategory, DayPlan, CandidateLocation, Currency, CURRENCY_META, EstimatedCostItem } from "@/types/trip";
 import { ACTIVITY_CATEGORY_META, generateId } from "@/lib/utils";
 import { useCurrency } from "@/contexts/CurrencyContext";
+import { BUDGET_CATEGORIES, activityCostItems, itemBudgetTHB, formatTHB } from "@/lib/budget";
 
 interface AddActivityModalProps {
   days: DayPlan[];
@@ -69,14 +70,25 @@ export default function AddActivityModal({ days, startDate, endDate, initialActi
   const [transport,    setTransport]    = useState(initialActivity?.transportationNote ?? "");
   const [category,     setCategory]     = useState<ActivityCategory>(initialActivity?.category ?? "sightseeing");
   const [errors,       setErrors]       = useState<Record<string,string>>({});
-  // ── Estimated budget (planning only — never written to expenses) ──────────
-  const { baseCurrency } = useCurrency();
-  const [estCost, setEstCost] = useState<string>(
-    initialActivity?.estimatedCost ? String(initialActivity.estimatedCost) : ""
+  // ── Estimated costs (planning only — never written to expenses) ──────────
+  const { baseCurrency, rates } = useCurrency();
+  const [costItems, setCostItems] = useState<EstimatedCostItem[]>(() =>
+    activityCostItems(initialActivity).map((i) => ({ ...i, currency: i.currency ?? "THB" }))
   );
-  const [estCurrency, setEstCurrency] = useState<Currency>(
-    initialActivity?.estimatedCurrency ?? baseCurrency ?? "THB"
-  );
+  const costSubtotal = costItems.reduce((s, i) => s + itemBudgetTHB(i, rates), 0);
+
+  function addCostItem() {
+    setCostItems((prev) => [
+      ...prev,
+      { id: `cost-${generateId()}`, title: "", amount: 0, category: "other", currency: baseCurrency ?? "THB" },
+    ]);
+  }
+  function removeCostItem(id: string) {
+    setCostItems((prev) => prev.filter((i) => i.id !== id));
+  }
+  function updateCostItem(id: string, patch: Partial<EstimatedCostItem>) {
+    setCostItems((prev) => prev.map((i) => (i.id === id ? { ...i, ...patch } : i)));
+  }
 
   const [isAddingCategory, setIsAddingCategory] = useState(false);
   const [newCatEmoji, setNewCatEmoji] = useState("✨");
@@ -117,8 +129,11 @@ export default function AddActivityModal({ days, startDate, endDate, initialActi
       location: locations.find(l => l.name.trim())?.name.trim() || undefined,
       transportationNote: transport.trim() || undefined,
       category,
-      estimatedCost: Number(estCost) > 0 ? Number(estCost) : undefined,
-      estimatedCurrency: Number(estCost) > 0 ? estCurrency : undefined,
+      estimatedCosts: costItems
+        .filter((i) => Number(i.amount) > 0)
+        .map((i) => ({ ...i, title: i.title.trim(), amount: Number(i.amount) })),
+      estimatedCost: undefined,
+      estimatedCurrency: undefined,
     });
     setRefreshToggle?.((prev: number) => prev + 1);
     onClose();
@@ -279,32 +294,81 @@ export default function AddActivityModal({ days, startDate, endDate, initialActi
             </div>
           </div>
 
-          {/* Estimated cost — planning only */}
+          {/* Estimated costs — planning only */}
           <div>
             <label className="mb-1.5 block font-pixel text-[8px] uppercase tracking-widest text-stone-600 dark:text-stone-400">
-              💰 ค่าใช้จ่ายโดยประมาณ <span className="normal-case font-mono text-[9px] text-stone-400">(optional · planning only)</span>
+              💰 รายการค่าใช้จ่ายโดยประมาณ (Estimated Costs)
             </label>
-            <div className="flex gap-2">
-              <input
-                type="number"
-                inputMode="decimal"
-                min="0"
-                placeholder="0"
-                value={estCost}
-                onChange={(e) => setEstCost(e.target.value)}
-                className={inputCls()}
-              />
-              <select
-                value={estCurrency}
-                onChange={(e) => setEstCurrency(e.target.value as Currency)}
-                className="w-28 shrink-0 border-2 border-stone-400 bg-[#fdfbf7] px-2 py-2.5 font-mono text-sm text-stone-900 outline-none focus:border-stone-800 dark:border-stone-600 dark:bg-[#1e1815] dark:text-[#fdfbf7]"
-              >
-                {(Object.keys(CURRENCY_META) as Currency[]).map((c) => (
-                  <option key={c} value={c}>{CURRENCY_META[c].flag} {c}</option>
-                ))}
-              </select>
+
+            {costItems.length === 0 && (
+              <p className="mb-2 font-mono text-[10px] italic text-stone-400 dark:text-stone-500">No estimated costs yet.</p>
+            )}
+
+            <div className="space-y-2">
+              {costItems.map((item) => (
+                <div key={item.id} className="space-y-1.5 border-2 border-stone-300 bg-[#fdfbf7] px-2.5 py-2 dark:border-stone-600 dark:bg-[#1e1815]">
+                  <div className="flex items-start gap-2">
+                    <input
+                      type="text"
+                      placeholder="เช่น ค่าเข้า, ค่ามื้อเที่ยง"
+                      value={item.title}
+                      onChange={(e) => updateCostItem(item.id, { title: e.target.value })}
+                      className={inputCls()}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeCostItem(item.id)}
+                      title="Remove item"
+                      className="flex h-10 w-10 shrink-0 items-center justify-center border-2 border-red-300 bg-red-50 text-red-600 transition-colors hover:bg-red-100 dark:border-red-800 dark:bg-red-900/30 dark:text-red-400 dark:hover:bg-red-900/50"
+                    >
+                      🗑
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-[1fr_auto_auto] gap-2">
+                    <input
+                      type="number"
+                      inputMode="decimal"
+                      min="0"
+                      placeholder="Amount"
+                      value={item.amount ? item.amount : ""}
+                      onChange={(e) => updateCostItem(item.id, { amount: Number(e.target.value) })}
+                      className="w-full min-w-0 border-2 border-stone-300 bg-[#f5f5f0] px-3 py-1.5 font-mono text-sm text-stone-800 outline-none focus:border-stone-600 dark:border-stone-700 dark:bg-[#28211d] dark:text-[#f5ebd5]"
+                    />
+                    <select
+                      value={item.currency ?? "THB"}
+                      onChange={(e) => updateCostItem(item.id, { currency: e.target.value as Currency })}
+                      className="w-20 border-2 border-stone-300 bg-[#f5f5f0] px-1.5 py-1.5 font-mono text-xs text-stone-800 outline-none dark:border-stone-700 dark:bg-[#28211d] dark:text-[#f5ebd5]"
+                    >
+                      {(Object.keys(CURRENCY_META) as Currency[]).map((c) => (
+                        <option key={c} value={c}>{c}</option>
+                      ))}
+                    </select>
+                    <select
+                      value={item.category}
+                      onChange={(e) => updateCostItem(item.id, { category: e.target.value })}
+                      className="w-32 border-2 border-stone-300 bg-[#f5f5f0] px-1.5 py-1.5 font-mono text-xs text-stone-800 outline-none dark:border-stone-700 dark:bg-[#28211d] dark:text-[#f5ebd5]"
+                    >
+                      {BUDGET_CATEGORIES.map((c) => (
+                        <option key={c.id} value={c.id}>{c.emoji} {c.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              ))}
             </div>
-            <p className="mt-1 font-mono text-[9px] text-stone-400">Uses the Category selected above. Does not affect real expenses or settlements.</p>
+
+            <button
+              type="button"
+              onClick={addCostItem}
+              className="mt-2 flex w-full items-center justify-center gap-2 border-2 border-dashed border-stone-400 bg-[#fdfbf7] py-2 font-mono text-[11px] text-stone-600 transition-colors hover:border-stone-600 hover:bg-[#f0e8d4] dark:border-stone-600 dark:bg-[#28211d] dark:text-stone-400 dark:hover:border-[#54463d]"
+            >
+              <span>＋</span> เพิ่มรายการค่าใช้จ่าย
+            </button>
+
+            <div className="mt-2 flex items-center justify-between font-mono text-xs">
+              <span className="text-stone-500 dark:text-stone-400">Subtotal (planning only)</span>
+              <span className="font-bold tabular-nums text-amber-800 dark:text-amber-300">~{formatTHB(costSubtotal)}</span>
+            </div>
           </div>
 
           <div>

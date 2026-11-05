@@ -9,7 +9,7 @@ import AddActivityModal from "@/components/AddActivityModal";
 import ActualLogTab from "@/components/ActualLogTab";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { useCurrency } from "@/contexts/CurrencyContext";
-import { activityBudgetTHB, dayBudgetTHB, formatTHB } from "@/lib/budget";
+import { activityCostItems, budgetCategoryMeta, dayBudgetTHB, itemBudgetTHB, formatTHB } from "@/lib/budget";
 
 interface ItineraryTabProps {
   trip: Trip;
@@ -39,11 +39,13 @@ export default function ItineraryTab({ trip, onAddActivity, onEditActivity, onDe
   let budgetTotal = 0;
   safeDays.forEach((d) => {
     (Array.isArray(d?.activities) ? d.activities : []).forEach((a) => {
-      const v = activityBudgetTHB(a, rates);
-      if (v <= 0) return;
-      const key = a?.category || "other";
-      budgetByCat[key] = (budgetByCat[key] ?? 0) + v;
-      budgetTotal += v;
+      activityCostItems(a).forEach((item) => {
+        const v = itemBudgetTHB(item, rates);
+        if (v <= 0) return;
+        const key = budgetCategoryMeta(item.category).id;
+        budgetByCat[key] = (budgetByCat[key] ?? 0) + v;
+        budgetTotal += v;
+      });
     });
   });
   const budgetDays = safeDays
@@ -51,10 +53,7 @@ export default function ItineraryTab({ trip, onAddActivity, onEditActivity, onDe
     .filter((d) => d.total > 0);
   const budgetCats = Object.entries(budgetByCat).sort((a, b) => b[1] - a[1]);
   function budgetCatMeta(id: string) {
-    const meta = ACTIVITY_CATEGORY_META[id as ActivityCategory];
-    if (meta) return { emoji: meta.emoji, label: meta.label };
-    const custom = (Array.isArray(customCategories) ? customCategories : []).find((c) => c?.id === id);
-    return { emoji: custom?.emoji ?? "✨", label: custom?.label ?? "Other" };
+    return budgetCategoryMeta(id);
   }
   const allActivities = safeDays.flatMap((d) => Array.isArray(d?.activities) ? d.activities : []);
   const counts: Partial<Record<Filter, number>> = { all: allActivities.length };

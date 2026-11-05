@@ -4,7 +4,7 @@ import { ActivityItem, ActivityCategory } from "@/types/trip";
 import { ACTIVITY_CATEGORY_META, formatDate, addDaysToISO } from "@/lib/utils";
 import { DraggableProvidedDragHandleProps } from "@hello-pangea/dnd";
 import { useCurrency } from "@/contexts/CurrencyContext";
-import { activityBudgetTHB, formatTHB } from "@/lib/budget";
+import { activityBudgetTHB, activityCostItems, budgetCategoryMeta, itemBudgetTHB, formatTHB } from "@/lib/budget";
 
 interface ActivityRowProps {
   activity: ActivityItem;
@@ -33,6 +33,7 @@ export default function ActivityRow({ activity, destination, isLast, onEdit, onD
   const safeCategories = Array.isArray(customCategories) ? customCategories : [];
   const { rates } = useCurrency();
   const estThb = activityBudgetTHB(activity, rates);
+  const costItems = activityCostItems(activity);
   const customCat = safeCategories.find((c) => c && c.id === activity?.category);
   const categoryName = activity?.category || 'free';
   const meta      = ACTIVITY_CATEGORY_META[categoryName as ActivityCategory] || { label: customCat?.label || categoryName, emoji: customCat?.emoji || "✨" };
@@ -123,6 +124,25 @@ export default function ActivityRow({ activity, destination, isLast, onEdit, onD
         </h3>
         {activity?.description && (
           <p className="mb-1.5 whitespace-pre-line font-mono text-xs leading-relaxed text-stone-600 dark:text-[#f5ebd5]">{typeof activity?.description === 'string' ? activity.description : String((activity?.description as any)?.name || activity?.description || '')}</p>
+        )}
+        {/* Estimated cost breakdown chips (planning only) */}
+        {costItems.length > 0 && (
+          <div className="mb-1.5 flex flex-wrap gap-1.5">
+            {costItems.map((item) => {
+              const m = budgetCategoryMeta(item.category);
+              return (
+                <span
+                  key={item.id}
+                  title={`${m.label} (planning only)`}
+                  className="inline-flex items-center gap-1 border border-stone-300 bg-[#f5eed7] px-2 py-0.5 font-mono text-[10px] text-stone-700 dark:border-[#54463d] dark:bg-[#362d28] dark:text-[#f5ebd5]"
+                >
+                  <span>{m.emoji}</span>
+                  {item.title && <span className="max-w-[10rem] truncate">{item.title}</span>}
+                  <span className="font-bold tabular-nums">~{formatTHB(itemBudgetTHB(item, rates))}</span>
+                </span>
+              );
+            })}
+          </div>
         )}
         {/* ── Candidate Locations list ─────────────────────────────────── */}
         {(() => {

@@ -133,10 +133,21 @@ export interface ActivityItem {
   locations?: CandidateLocation[];
   transportationNote?: string;
   category: ActivityCategory;
-  /** Pre-trip planning estimate ONLY — never merged with real expenses or settlements. */
+  /** Pre-trip planning estimates ONLY — never merged with real expenses or settlements. */
+  estimatedCosts?: EstimatedCostItem[];
+  /** @deprecated single estimate from the first version; read as one item of `estimatedCosts`. */
   estimatedCost?: number;
-  /** Currency of `estimatedCost`; defaults to the trip base currency / THB. */
+  /** @deprecated currency of the legacy `estimatedCost`. */
   estimatedCurrency?: Currency;
+}
+
+export interface EstimatedCostItem {
+  id: string;
+  title: string;
+  amount: number;
+  /** Budget category id: food | transport | accommodation | activities | shopping | other */
+  category: string;
+  currency?: Currency;
 }
 
 export interface DayPlan {
