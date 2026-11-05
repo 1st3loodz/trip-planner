@@ -8,6 +8,8 @@ import DayCard from "@/components/DayCard";
 import AddActivityModal from "@/components/AddActivityModal";
 import ActualLogTab from "@/components/ActualLogTab";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { useCurrency } from "@/contexts/CurrencyContext";
+import { activityBudgetTHB, dayBudgetTHB, formatTHB } from "@/lib/budget";
 
 interface ItineraryTabProps {
   trip: Trip;
@@ -30,6 +32,30 @@ export default function ItineraryTab({ trip, onAddActivity, onEditActivity, onDe
   const [showActualLog, setShowActualLog] = useState<boolean>(false);
 
   const safeDays = Array.isArray(trip?.days) ? trip.days : [];
+  const { rates } = useCurrency();
+
+  // ── Estimated budget (planning only — independent from expenses/settlements) ──
+  const budgetByCat: Record<string, number> = {};
+  let budgetTotal = 0;
+  safeDays.forEach((d) => {
+    (Array.isArray(d?.activities) ? d.activities : []).forEach((a) => {
+      const v = activityBudgetTHB(a, rates);
+      if (v <= 0) return;
+      const key = a?.category || "other";
+      budgetByCat[key] = (budgetByCat[key] ?? 0) + v;
+      budgetTotal += v;
+    });
+  });
+  const budgetDays = safeDays
+    .map((d) => ({ dayNumber: d.dayNumber, total: dayBudgetTHB(d, rates) }))
+    .filter((d) => d.total > 0);
+  const budgetCats = Object.entries(budgetByCat).sort((a, b) => b[1] - a[1]);
+  function budgetCatMeta(id: string) {
+    const meta = ACTIVITY_CATEGORY_META[id as ActivityCategory];
+    if (meta) return { emoji: meta.emoji, label: meta.label };
+    const custom = (Array.isArray(customCategories) ? customCategories : []).find((c) => c?.id === id);
+    return { emoji: custom?.emoji ?? "✨", label: custom?.label ?? "Other" };
+  }
   const allActivities = safeDays.flatMap((d) => Array.isArray(d?.activities) ? d.activities : []);
   const counts: Partial<Record<Filter, number>> = { all: allActivities.length };
   allActivities.forEach((a) => { 
@@ -132,6 +158,54 @@ export default function ItineraryTab({ trip, onAddActivity, onEditActivity, onDe
       {showActualLog && (
         <div className="mb-8 animate-in slide-in-from-top-2 fade-in duration-200">
           <ActualLogTab tripId={trip.id} days={trip.days} tripStartDate={trip.startDate} />
+        </div>
+      )}
+
+      {/* ── Estimated Budget summary (planning only) ───────────────────── */}
+      {budgetTotal > 0 && (
+        <div className="mb-5 border-2 border-stone-800 bg-[#fdfbf7] p-4 shadow-[3px_3px_0_#292524] dark:border-[#54463d] dark:bg-[#362d28] dark:shadow-[3px_3px_0_#54463d]">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h3 className="font-pixel text-[9px] uppercase tracking-wider text-stone-800 dark:text-[#fdfbf7]">
+              💰 งบประมาณคาดการณ์รวม
+            </h3>
+            <span className="font-mono text-lg font-black tabular-nums text-amber-800 dark:text-amber-300">
+              ~{formatTHB(budgetTotal)}
+            </span>
+          </div>
+          <p className="mt-0.5 font-mono text-[9px] text-stone-500 dark:text-stone-400">
+            Planning estimate only — not included in actual expenses or settlements.
+          </p>
+
+          {/* Category chips + bars */}
+          <div className="mt-3 space-y-1.5">
+            {budgetCats.map(([id, amt]) => {
+              const m = budgetCatMeta(id);
+              const pct = budgetTotal > 0 ? (amt / budgetTotal) * 100 : 0;
+              return (
+                <div key={id} className="flex items-center gap-2 font-mono text-[10px]">
+                  <span className="w-28 shrink-0 truncate text-stone-700 dark:text-[#f5ebd5]">{m.emoji} {m.label}</span>
+                  <div className="h-2 flex-1 border border-stone-400 bg-[#f5eed7] dark:border-[#54463d] dark:bg-[#28211d]">
+                    <div className="h-full bg-[#4a7c59] dark:bg-[#2d5a3d]" style={{ width: `${pct}%` }} />
+                  </div>
+                  <span className="w-20 shrink-0 text-right tabular-nums text-stone-800 dark:text-[#fdfbf7]">~{formatTHB(amt)}</span>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Daily quick stats */}
+          {budgetDays.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-1.5 border-t-2 border-stone-200 pt-3 dark:border-stone-700">
+              {budgetDays.map((d) => (
+                <span key={d.dayNumber} className="border border-stone-400 bg-[#f5eed7] px-2 py-1 font-mono text-[10px] text-stone-800 dark:border-[#54463d] dark:bg-[#28211d] dark:text-[#f5ebd5]">
+                  Day {d.dayNumber} · ~{formatTHB(d.total)}
+                </span>
+              ))}
+              <span className="px-2 py-1 font-mono text-[10px] text-stone-500 dark:text-stone-400">
+                avg ~{formatTHB(budgetTotal / budgetDays.length)}/day
+              </span>
+            </div>
+          )}
         </div>
       )}
 

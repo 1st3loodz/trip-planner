@@ -3,6 +3,8 @@
 import { ActivityItem, ActivityCategory } from "@/types/trip";
 import { ACTIVITY_CATEGORY_META, formatDate, addDaysToISO } from "@/lib/utils";
 import { DraggableProvidedDragHandleProps } from "@hello-pangea/dnd";
+import { useCurrency } from "@/contexts/CurrencyContext";
+import { activityBudgetTHB, formatTHB } from "@/lib/budget";
 
 interface ActivityRowProps {
   activity: ActivityItem;
@@ -29,6 +31,8 @@ const COZY_CATEGORY_STYLE: Record<ActivityCategory, { bg: string; border: string
 
 export default function ActivityRow({ activity, destination, isLast, onEdit, onDelete, dayNumber, tripStartDate, customCategories = [], dragHandleProps }: ActivityRowProps) {
   const safeCategories = Array.isArray(customCategories) ? customCategories : [];
+  const { rates } = useCurrency();
+  const estThb = activityBudgetTHB(activity, rates);
   const customCat = safeCategories.find((c) => c && c.id === activity?.category);
   const categoryName = activity?.category || 'free';
   const meta      = ACTIVITY_CATEGORY_META[categoryName as ActivityCategory] || { label: customCat?.label || categoryName, emoji: customCat?.emoji || "✨" };
@@ -103,6 +107,15 @@ export default function ActivityRow({ activity, destination, isLast, onEdit, onD
           <span className="font-mono text-[9px] px-2 py-0.5 text-stone-500 border border-stone-300 dark:border-stone-600 rounded bg-[#f5eed7]/50 dark:bg-[#362d28]/50">
             Day {dayNumber} ({formatDate(computedDate)})
           </span>
+          {/* Estimated cost (planning only) */}
+          {estThb > 0 && (
+            <span
+              title="Estimated budget (planning only)"
+              className="ml-auto font-mono text-[11px] font-bold tabular-nums text-amber-800 dark:text-amber-300"
+            >
+              ~{formatTHB(estThb)}
+            </span>
+          )}
         </div>
 
         <h3 className="mb-1 font-mono text-sm font-semibold leading-snug text-stone-800 dark:text-[#fdfbf7]">

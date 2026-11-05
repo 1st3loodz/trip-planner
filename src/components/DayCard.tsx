@@ -5,6 +5,8 @@ import { DraggableProvidedDragHandleProps, Droppable, Draggable } from "@hello-p
 import { DayPlan, ActivityItem } from "@/types/trip";
 import { formatDate, addDaysToISO } from "@/lib/utils";
 import ActivityRow from "@/components/ActivityRow";
+import { useCurrency } from "@/contexts/CurrencyContext";
+import { dayBudgetTHB, formatTHB } from "@/lib/budget";
 
 interface DayCardProps {
   day: DayPlan;
@@ -21,6 +23,8 @@ interface DayCardProps {
 
 export default function DayCard({ day, destination, tripStartDate, defaultOpen = true, dragHandleProps, onEditActivity, onDeleteActivity, customCategories = [], isStaticMode = false }: DayCardProps) {
   const [open, setOpen] = useState(defaultOpen);
+  const { rates } = useCurrency();
+  const dayBudget = dayBudgetTHB(day, rates);
 
   // Compute this day's date dynamically from the trip start date + dayNumber offset.
   // Uses timezone-safe local-date math (addDaysToISO) — never use day.date which can be stale.
@@ -70,7 +74,15 @@ export default function DayCard({ day, destination, tripStartDate, defaultOpen =
           </div>
 
           <div className="shrink-0 text-right">
-            <div className="font-mono text-[10px] text-stone-600 dark:text-stone-400">{day.activities.length} entries</div>
+            <div className="font-mono text-[10px] text-stone-600 dark:text-stone-400">
+              {dayBudget > 0 && (
+                <>
+                  <span className="font-bold text-amber-800 dark:text-amber-300">~{formatTHB(dayBudget)}</span>
+                  <span className="mx-1.5 text-stone-400">|</span>
+                </>
+              )}
+              {day.activities.length} entries
+            </div>
           </div>
 
           {/* Arrow indicator */}

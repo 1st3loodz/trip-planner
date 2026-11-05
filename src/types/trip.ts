@@ -133,6 +133,10 @@ export interface ActivityItem {
   locations?: CandidateLocation[];
   transportationNote?: string;
   category: ActivityCategory;
+  /** Pre-trip planning estimate ONLY — never merged with real expenses or settlements. */
+  estimatedCost?: number;
+  /** Currency of `estimatedCost`; defaults to the trip base currency / THB. */
+  estimatedCurrency?: Currency;
 }
 
 export interface DayPlan {

@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ActivityItem, ActivityCategory, DayPlan, CandidateLocation } from "@/types/trip";
+import { ActivityItem, ActivityCategory, DayPlan, CandidateLocation, Currency, CURRENCY_META } from "@/types/trip";
 import { ACTIVITY_CATEGORY_META, generateId } from "@/lib/utils";
+import { useCurrency } from "@/contexts/CurrencyContext";
 
 interface AddActivityModalProps {
   days: DayPlan[];
@@ -68,6 +69,14 @@ export default function AddActivityModal({ days, startDate, endDate, initialActi
   const [transport,    setTransport]    = useState(initialActivity?.transportationNote ?? "");
   const [category,     setCategory]     = useState<ActivityCategory>(initialActivity?.category ?? "sightseeing");
   const [errors,       setErrors]       = useState<Record<string,string>>({});
+  // ── Estimated budget (planning only — never written to expenses) ──────────
+  const { baseCurrency } = useCurrency();
+  const [estCost, setEstCost] = useState<string>(
+    initialActivity?.estimatedCost ? String(initialActivity.estimatedCost) : ""
+  );
+  const [estCurrency, setEstCurrency] = useState<Currency>(
+    initialActivity?.estimatedCurrency ?? baseCurrency ?? "THB"
+  );
 
   const [isAddingCategory, setIsAddingCategory] = useState(false);
   const [newCatEmoji, setNewCatEmoji] = useState("✨");
@@ -108,6 +117,8 @@ export default function AddActivityModal({ days, startDate, endDate, initialActi
       location: locations.find(l => l.name.trim())?.name.trim() || undefined,
       transportationNote: transport.trim() || undefined,
       category,
+      estimatedCost: Number(estCost) > 0 ? Number(estCost) : undefined,
+      estimatedCurrency: Number(estCost) > 0 ? estCurrency : undefined,
     });
     setRefreshToggle?.((prev: number) => prev + 1);
     onClose();
@@ -266,6 +277,34 @@ export default function AddActivityModal({ days, startDate, endDate, initialActi
                 </button>
               )}
             </div>
+          </div>
+
+          {/* Estimated cost — planning only */}
+          <div>
+            <label className="mb-1.5 block font-pixel text-[8px] uppercase tracking-widest text-stone-600 dark:text-stone-400">
+              💰 ค่าใช้จ่ายโดยประมาณ <span className="normal-case font-mono text-[9px] text-stone-400">(optional · planning only)</span>
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="number"
+                inputMode="decimal"
+                min="0"
+                placeholder="0"
+                value={estCost}
+                onChange={(e) => setEstCost(e.target.value)}
+                className={inputCls()}
+              />
+              <select
+                value={estCurrency}
+                onChange={(e) => setEstCurrency(e.target.value as Currency)}
+                className="w-28 shrink-0 border-2 border-stone-400 bg-[#fdfbf7] px-2 py-2.5 font-mono text-sm text-stone-900 outline-none focus:border-stone-800 dark:border-stone-600 dark:bg-[#1e1815] dark:text-[#fdfbf7]"
+              >
+                {(Object.keys(CURRENCY_META) as Currency[]).map((c) => (
+                  <option key={c} value={c}>{CURRENCY_META[c].flag} {c}</option>
+                ))}
+              </select>
+            </div>
+            <p className="mt-1 font-mono text-[9px] text-stone-400">Uses the Category selected above. Does not affect real expenses or settlements.</p>
           </div>
 
           <div>
